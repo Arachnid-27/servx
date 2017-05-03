@@ -1,6 +1,8 @@
 #include "clock.h"
 
+
 Clock* Clock::clock = new Clock;
+
 
 void Clock::update() {
     if (!mtx.try_lock()) {
@@ -11,6 +13,7 @@ void Clock::update() {
 
     mtx.unlock();
 }
+
 
 inline std::time_t Clock::get_milliseconds() {
     using namespace std::chrono;

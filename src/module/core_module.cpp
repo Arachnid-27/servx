@@ -1,4 +1,5 @@
-#include "main_core_module.h"
+#include "core_module.h"
+
 
 bool MainCoreModule::init_conf() {
     conf->worker = 1;
@@ -6,7 +7,8 @@ bool MainCoreModule::init_conf() {
     return true;
 }
 
-bool MainCoreModule::worker_handler(const std::vector<std::string>& v) {
+
+bool MainCoreModule::worker_handler(command_vals_t v) {
     auto conf = ModuleManager::instance()->get_conf<MainCoreModule>();
     conf->worker = atoi(v[0].c_str());
 
@@ -17,14 +19,16 @@ bool MainCoreModule::worker_handler(const std::vector<std::string>& v) {
     return true;
 }
 
-bool MainCoreModule::daemon_handler(const std::vector<std::string>& v) {
+
+bool MainCoreModule::daemon_handler(command_vals_t v) {
     auto conf = ModuleManager::instance()->get_conf<MainCoreModule>();
     conf->daemon = v[0] == "on" ? true : false;
 
     return true;
 }
 
-bool MainCoreModule::error_log_handler(const std::vector<std::string>& v) {
+
+bool MainCoreModule::error_log_handler(command_vals_t v) {
     auto cycle = Cycle::instance();
 
     for (auto s : v) {

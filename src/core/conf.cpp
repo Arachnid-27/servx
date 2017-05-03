@@ -1,17 +1,8 @@
-#include "conf_parser.h"
+#include "conf.h"
+
 
 ConfParser* ConfParser::parser = new ConfParser;
 
-void ConfParser::__debug_print_conf(const ConfItem& item) {
-    std::cout << item.get_name() << ' ';
-    for (auto s : item.get_values()) {
-        std::cout << s << ' ';
-    }
-    std::cout << std::endl;
-    for (auto c : item.get_items()) {
-        __debug_print_conf(c);
-    }
-}
 
 bool ConfParser::parse() {
     if (conf_file == nullptr) {
@@ -33,6 +24,7 @@ bool ConfParser::parse() {
 
     return true;
 }
+
 
 bool ConfParser::execute(const ConfItem& item, const ModuleManager& manager) {
     auto cmd = manager.find_command(item.get_name());
@@ -68,6 +60,7 @@ bool ConfParser::execute(const ConfItem& item, const ModuleManager& manager) {
     return true;
 }
 
+
 bool ConfParser::open(const char *pathname) {
     if (conf_file != nullptr) {
         delete conf_file;
@@ -75,6 +68,7 @@ bool ConfParser::open(const char *pathname) {
     conf_file = new File(pathname);
     return conf_file->open(OPEN_MODE_RDONLY);
 }
+
 
 bool ConfParser::parse(ConfItem *parent) {
     ConfItem *item = nullptr;
@@ -144,6 +138,7 @@ bool ConfParser::parse(ConfItem *parent) {
 
     return true;
 }
+
 
 int ConfParser::next_token() {
     char ch;

@@ -1,12 +1,26 @@
 #ifndef _CYCLE_H_
 #define _CYCLE_H_
 
-#include "core.h"
+
+#include "process.h"
+#include "connection.h"
+#include "file.h"
+#include "listening.h"
+#include "clock.h"
+#include "conf.h"
+
+#include <memory>
+#include <vector>
+#include <queue>
+#include <algorithm>
+
 
 class Cycle {
     using conn_ptr = std::shared_ptr<Connection>;
 
 public:
+    bool reload();
+
     void open_file(const std::string& s);
 
     Process& spawn_process(const process_task_t& p);
@@ -29,5 +43,6 @@ private:
 private:
     static Cycle* cycle;
 };
+
 
 #endif

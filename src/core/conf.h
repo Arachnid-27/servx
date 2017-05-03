@@ -1,7 +1,13 @@
 #ifndef _CONF_PARSER_H_
 #define _CONF_PARSER_H_
 
-#include "core.h"
+
+#include "file.h"
+#include "module.h"
+
+#include <vector>
+#include <string>
+
 
 class ConfItem {
 public:
@@ -22,6 +28,7 @@ private:
     std::vector<std::string> values;
     std::vector<ConfItem> items;
 };
+
 
 class ConfParser {
 public:
@@ -62,9 +69,6 @@ private:
     int next_token();
 
 private:
-    static void __debug_print_conf(const ConfItem& item);
-
-private:
     File *conf_file;
     ConfItem *root;
     char *buf;
@@ -73,5 +77,6 @@ private:
 private:
     static ConfParser* parser;
 };
+
 
 #endif

@@ -2,6 +2,28 @@
 
 Cycle* Cycle::cycle = new Cycle;
 
+bool Cycle::reload() {
+    Clock::instance()->update();
+
+    ConfParser::instance()->open("servx.conf");
+
+    if (!ConfParser::instance()->parse()) {
+        // error_log
+        return false;
+    }
+
+    for (auto& f : open_files) {
+        if (!f.open(OPEN_MODE_RDWR)) {
+            return false;
+        }
+    }
+
+    for (auto& s : listenings) {
+    }
+
+    return true;
+}
+
 void Cycle::open_file(const std::string& s) {
     auto beg = open_files.begin();
     auto end = open_files.end();

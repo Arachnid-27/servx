@@ -1,23 +1,22 @@
-#include "core.h"
-#include "conf_parser.h"
+#include "cycle.h"
+#include "daemon.h"
+#include "core_module.h"
+#include "worker.h"
+#include "master.h"
+
+#include <cstring>
+
 
 int main(int argc, char* argv[]) {
-    Clock::instance()->update();
+    auto cycle = Cycle::instance();
 
-    ConfParser::instance()->open("servx.conf");
-
-    if (!ConfParser::instance()->parse()) {
-        // error_log
-        exit(EXIT_FAILURE);
-    }
+    cycle->reload();
 
     auto conf = ModuleManager::instance()->get_conf<MainCoreModule>();
 
     if (conf->daemon) {
         daemonize();
     }
-
-    auto cycle = Cycle::instance();
 
     memcpy(argv[0], "servx-worker", sizeof("servx-worker"));
 

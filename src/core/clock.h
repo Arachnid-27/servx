@@ -1,7 +1,10 @@
 #ifndef _CLOCK_H_
 #define _CLOCK_H_
 
-#include "core.h"
+
+#include <mutex>
+#include <chrono>
+
 
 class Clock {
 public:
@@ -25,5 +28,6 @@ private:
 private:
     static Clock* clock;
 };
+
 
 #endif
