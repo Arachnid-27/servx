@@ -1,18 +1,18 @@
 #ifndef _CONNECTION_H_
 #define _CONNECTION_H_
 
-
 #include "clock.h"
 #include "event.h"
 
+namespace servx {
+
+class Event;
 
 class Connection {
 public:
-    Connection() {
-        fd = -1;
-        read_event = new Event(this, 0);
-        write_event = new Event(this, 1);
-    }
+    Connection();
+
+    Connection(const Connection&) = delete;
 
     int get_fd() const { return fd; }
 
@@ -26,5 +26,6 @@ private:
     Event* write_event;
 };
 
+}
 
 #endif

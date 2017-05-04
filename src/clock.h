@@ -1,25 +1,23 @@
 #ifndef _CLOCK_H_
 #define _CLOCK_H_
 
-
 #include <mutex>
-#include <chrono>
 
+namespace servx {
 
 class Clock {
 public:
+    Clock(const Clock&) = delete;
+
     void update();
 
     std::time_t get_current_ms() const { return current_ms; }
 
+public:
     static Clock* instance() { return clock; }
 
 private:
     Clock() = default;
-    
-    Clock(const Clock&) = delete;
-
-    std::time_t get_milliseconds();
 
 private:
     std::mutex mtx;
@@ -29,5 +27,6 @@ private:
     static Clock* clock;
 };
 
+}
 
 #endif

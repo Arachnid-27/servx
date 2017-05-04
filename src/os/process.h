@@ -1,10 +1,9 @@
 #ifndef _PROCESS_H_
 #define _PROCESS_H_
 
-#include <unistd.h>
-#include <cstring>
-#include <cstdlib>
 #include <functional>
+
+namespace servx {
 
 using process_task_t = std::function<void ()>;
 
@@ -23,5 +22,7 @@ private:
     int status; 
     process_task_t proc;
 };
+
+}
 
 #endif

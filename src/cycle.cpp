@@ -1,13 +1,32 @@
 #include "cycle.h"
 
+#include "conf_parser.h"
+#include "module_manager.h"
+
+namespace servx {
+
 Cycle* Cycle::cycle = new Cycle;
 
 bool Cycle::reload() {
     Clock::instance()->update();
 
-    ConfParser::instance()->open("servx.conf");
+    auto manager = ModuleManager::instance();
 
-    if (!ConfParser::instance()->parse()) {
+    if (!manager->for_each([](Module* m) { return m->init_conf(); })) {
+        // error_log
+        return false;
+    }
+
+    auto parser = ConfParser::instance();
+
+    parser->open("servx.conf");
+
+    if (!parser->parse()) {
+        // error_log
+        return false;
+    }
+
+    if (!manager->for_each([](Module* m) { return m->init_module(); })) {
         // error_log
         return false;
     }
@@ -39,4 +58,6 @@ void Cycle::open_file(const std::string& s) {
 Process& Cycle::spawn_process(const process_task_t& p) {
     processes.emplace_back(p);
     return processes.back();
+}
+
 }

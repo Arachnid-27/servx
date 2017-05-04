@@ -3,11 +3,14 @@
 
 #include <fcntl.h>
 #include <unistd.h>
+
 #include <string>
 
 #define OPEN_MODE_RDONLY O_RDONLY
 #define OPEN_MODE_WDONLY O_WDONLY
 #define OPEN_MODE_RDWR   O_RDWR
+
+namespace servx {
 
 class File {
 public:
@@ -45,5 +48,7 @@ private:
 bool operator==(const File& lhs, const File& rhs);
 
 bool operator!=(const File& lhs, const File& rhs);
+
+}
 
 #endif

@@ -1,24 +1,23 @@
 #ifndef _CYCLE_H_
 #define _CYCLE_H_
 
+#include <algorithm>
+#include <memory>
+#include <queue>
+#include <vector>
 
-#include "process.h"
 #include "connection.h"
+#include "clock.h"
 #include "file.h"
 #include "listening.h"
-#include "clock.h"
-#include "conf.h"
+#include "process.h"
 
-#include <memory>
-#include <vector>
-#include <queue>
-#include <algorithm>
-
+namespace servx {
 
 class Cycle {
-    using conn_ptr = std::shared_ptr<Connection>;
-
 public:
+    Cycle(const Cycle&) = delete;
+
     bool reload();
 
     void open_file(const std::string& s);
@@ -30,19 +29,18 @@ public:
 
 private:
     Cycle() = default;
-    
-    Cycle(const Cycle&) = delete;
 
 private:
     std::vector<Process> processes;
     std::vector<File> open_files;
     std::vector<Listening> listenings;
-    std::queue<conn_ptr> free_connections;
-    std::queue<conn_ptr> reusable_connections;
+    std::queue<Connection*> free_connections;
+    std::queue<Connection*> reusable_connections;
 
 private:
     static Cycle* cycle;
 };
 
+}
 
 #endif

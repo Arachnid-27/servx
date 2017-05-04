@@ -1,20 +1,15 @@
 #ifndef _EPOLL_MODULE_H_
 #define _EPOLL_MODULE_H_
 
-
-#include "clock.h"
-#include "event_module.h"
-
-#include <errno.h>
 #include <sys/epoll.h>
 
-#include <unordered_map>
+#include "event_module.h"
 
+namespace servx {
 
 struct EpollModuleConf {
     int epoll_events;
 };
-
 
 class EpollModule: public ModuleWithConf<EventModule,
                           EpollModuleConf,
@@ -24,22 +19,21 @@ public:
         {
             new Command(ModuleType::EVENT_MODULE, "epoll_events",
                         epoll_events_handler, 1)
-        },
-        new EpollModuleConf) {}
+        }) {}
 
-    virtual bool init_conf();
+    bool init_conf() override;
 
-    virtual bool init_process();
+    bool init_process() override;
 
-    virtual bool add_event(Event* ev, int flags);
+    bool add_event(Event* ev, int flags) override;
 
-    virtual bool del_event(Event* ev, int flags);
+    bool del_event(Event* ev, int flags) override;
 
-    virtual bool add_connection(Connection* c);
+    bool add_connection(Connection* c) override;
 
-    virtual bool del_connection(Connection* c);
+    bool del_connection(Connection* c) override;
 
-    virtual bool process_events();
+    bool process_events() override;
 
 public:
     static bool epoll_events_handler(command_vals_t);
@@ -49,5 +43,6 @@ private:
     epoll_event *event_list;
 };
 
+}
 
 #endif

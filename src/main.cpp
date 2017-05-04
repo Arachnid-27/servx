@@ -1,11 +1,13 @@
-#include "cycle.h"
-#include "daemon.h"
-#include "core_module.h"
-#include "worker.h"
-#include "master.h"
-
 #include <cstring>
 
+#include "core_module.h"
+#include "cycle.h"
+#include "daemon.h"
+#include "master.h"
+#include "module_manager.h"
+#include "worker.h"
+
+using namespace servx;
 
 int main(int argc, char* argv[]) {
     auto cycle = Cycle::instance();

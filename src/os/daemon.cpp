@@ -1,5 +1,13 @@
 #include "daemon.h"
 
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <cstdlib>
+
+namespace servx {
+
 bool daemonize() {
     int fd;
 
@@ -41,4 +49,6 @@ bool daemonize() {
     }
 
     return true;
+}
+
 }

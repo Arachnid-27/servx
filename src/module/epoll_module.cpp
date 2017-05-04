@@ -1,14 +1,19 @@
 #include "epoll_module.h"
 
+#include <errno.h>
+
+#include "clock.h"
+#include "module_manager.h"
+
+namespace servx {
 
 bool EpollModule::init_conf() {
-    conf->epoll_events = 512;
+    conf.epoll_events = 512;
     return true;
 }
 
-
 bool EpollModule::init_process() {
-    if (conf->epoll_events <= 0) {
+    if (conf.epoll_events <= 0) {
         return false;
     }
 
@@ -17,11 +22,10 @@ bool EpollModule::init_process() {
         return false;
     }
 
-    event_list = new epoll_event[conf->epoll_events];
+    event_list = new epoll_event[conf.epoll_events];
 
     return true;
 }
-
 
 bool EpollModule::add_event(Event* ev, int flags) {
     int op, prev;
@@ -30,10 +34,10 @@ bool EpollModule::add_event(Event* ev, int flags) {
     Connection *c = ev->get_connection();
 
     if (ev->is_write_event()) {
-        active = c->get_read_event()->is_event_active();
+        active = c->get_read_event()->is_active();
         prev = EPOLLIN | EPOLLRDHUP;
     } else {
-        active = c->get_write_event()->is_event_active();
+        active = c->get_write_event()->is_active();
         prev = EPOLLOUT;
     }
 
@@ -53,17 +57,16 @@ bool EpollModule::add_event(Event* ev, int flags) {
         return false;
     }
 
-    ev->set_event_active(true);
+    ev->set_active(true);
 
     return true;
 }
-
 
 bool EpollModule::del_event(Event* ev, int flags) {
     Connection *c = ev->get_connection();
 
     if (c->get_fd() == -1) {
-        ev->set_event_active(false);
+        ev->set_active(false);
         return true;
     }
 
@@ -72,10 +75,10 @@ bool EpollModule::del_event(Event* ev, int flags) {
     bool active = false;
 
     if (ev->is_write_event()) {
-        active = c->get_read_event()->is_event_active();
+        active = c->get_read_event()->is_active();
         prev = EPOLLIN | EPOLLRDHUP;
     } else {
-        active = c->get_write_event()->is_event_active();
+        active = c->get_write_event()->is_active();
         prev = EPOLLOUT;
     }
 
@@ -93,11 +96,10 @@ bool EpollModule::del_event(Event* ev, int flags) {
         return false;
     }
 
-    ev->set_event_active(false);
+    ev->set_active(false);
 
     return true;
 }
-
 
 bool EpollModule::add_connection(Connection* c) {
     epoll_event ee;
@@ -125,15 +127,15 @@ bool EpollModule::del_connection(Connection* c) {
         }
     }
 
-    c->get_read_event()->set_event_active(false);
-    c->get_write_event()->set_event_active(false);
+    c->get_read_event()->set_active(false);
+    c->get_write_event()->set_active(false);
 
     return true;
 }
  
 
 bool EpollModule::process_events() {
-    int n = epoll_wait(ep, event_list, conf->epoll_events, -1);
+    int n = epoll_wait(ep, event_list, conf.epoll_events, -1);
 
     if (true) { // Todo wake up by SIGALRM
         Clock::instance()->update(); 
@@ -172,7 +174,7 @@ bool EpollModule::process_events() {
 
         event = c->get_read_event();
 
-        if ((flags & EPOLLIN) && event->is_event_active()) {
+        if ((flags & EPOLLIN) && event->is_active()) {
             if (flags & EPOLLRDHUP) {
                 // Todo
             }
@@ -183,7 +185,7 @@ bool EpollModule::process_events() {
 
         event = c->get_write_event();
 
-        if ((flags & EPOLLOUT) && event->is_event_active()) {
+        if ((flags & EPOLLOUT) && event->is_active()) {
             if (c->get_fd() == -1) {    // Todo handle stale event
                 continue;
             }
@@ -206,4 +208,6 @@ bool EpollModule::epoll_events_handler(command_vals_t v) {
     }
 
     return true;
+}
+
 }

@@ -1,18 +1,18 @@
-#include "module.h"
-#include "core_module.h"
-#include "event_module.h"
-#include "epoll_module.h"
+#include "module_manager.h"
 
+#include "core_module.h"
+#include "epoll_module.h"
+#include "event_module.h"
+
+namespace servx {
 
 ModuleManager* ModuleManager::manager = new ModuleManager;
-
 
 ModuleManager::ModuleManager() {
     create_module(ModuleIndex::MAIN_CORE_MODULE, new MainCoreModule);
     create_module(ModuleIndex::MAIN_EVENT_MODULE, new MainEventModule);
     create_module(ModuleIndex::EPOLL_MODULE, new EpollModule);
 }
-
 
 void ModuleManager::create_module(ModuleIndex index, Module* module) {
     modules[index] = module;
@@ -22,7 +22,6 @@ void ModuleManager::create_module(ModuleIndex index, Module* module) {
     }
 }
 
-
 Command* ModuleManager::find_command(const std::string& name) const {
     auto it = commands.find(name);
     if (it == commands.end()) {
@@ -30,7 +29,6 @@ Command* ModuleManager::find_command(const std::string& name) const {
     }
     return it->second;
 }
-
 
 bool ModuleManager::for_each(std::function<bool (Module*)> func) {
     for (size_t i = 0; i < ModuleIndex::NULL_MODULE; ++i) {
@@ -40,4 +38,6 @@ bool ModuleManager::for_each(std::function<bool (Module*)> func) {
     }
 
     return true;
+}
+
 }
