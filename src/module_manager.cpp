@@ -3,6 +3,7 @@
 #include "core_module.h"
 #include "epoll_module.h"
 #include "event_module.h"
+#include "http_module.h"
 
 namespace servx {
 
@@ -12,6 +13,7 @@ ModuleManager::ModuleManager() {
     create_module(ModuleIndex::MAIN_CORE_MODULE, new MainCoreModule);
     create_module(ModuleIndex::MAIN_EVENT_MODULE, new MainEventModule);
     create_module(ModuleIndex::EPOLL_MODULE, new EpollModule);
+    create_module(ModuleIndex::MAIN_HTTP_MODULE, new MainHttpModule);
 }
 
 void ModuleManager::create_module(ModuleIndex index, Module* module) {

@@ -1,7 +1,6 @@
 #ifndef _CONNECTION_H_
 #define _CONNECTION_H_
 
-#include "clock.h"
 #include "event.h"
 
 namespace servx {
@@ -14,16 +13,22 @@ public:
 
     Connection(const Connection&) = delete;
 
-    int get_fd() const { return fd; }
+    void open(int fd);
 
-    Event* get_read_event() const { return read_event; }
+    void close();
 
-    Event* get_write_event() const { return write_event; }
+    bool is_close() const { return socket_fd == -1; }
+
+    int get_fd() const { return socket_fd; }
+
+    Event* get_read_event() { return read_event; }
+
+    Event* get_write_event() { return write_event; }
 
 private:
-    int fd;
-    Event* read_event;
-    Event* write_event;
+    int socket_fd;
+    Event *read_event;
+    Event *write_event;
 };
 
 }

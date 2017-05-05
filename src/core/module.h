@@ -7,12 +7,21 @@
 #include <unordered_map>
 #include <initializer_list>
 
+#define ERROR_COMMAND -1
+
+#define lambda_handler(handler)                                 \
+        [this](command_vals_t v) { return this->handler(v); }
+
+#define lambda_post_handler(handler)                            \
+        [this]() { return this-handler(); }
+
 namespace servx {
 
 enum ModuleIndex {
     MAIN_CORE_MODULE,
     MAIN_EVENT_MODULE,
     EPOLL_MODULE,
+    MAIN_HTTP_MODULE,
     NULL_MODULE
 };
 
@@ -22,31 +31,44 @@ enum ModuleType {
     HTTP_MODULE
 };
 
+enum CommandBlock {
+    NULL_BLOCK,
+    CORE_BLOCK,
+    EVENT_BLOCK,
+    HTTP_BLOCK,
+    SERVER_BLOCK,
+    LOCATION_BLOCK,
+    ADDRESS_BLOCK
+};
+
 using command_vals_t = const std::vector<std::string>&;
-using command_handler_t = std::function<bool (command_vals_t)>;
+using command_handler_t = std::function<int (command_vals_t)>;
 using command_post_handler_t = std::function<bool ()>;
 
 class Command {
 public:
-    Command(const ModuleType t, const std::string& s,
-            const command_handler_t& ch, const int n = -1,
+    Command(CommandBlock b, const char* s,
+            const command_handler_t& ch, int n = -1,
             const command_post_handler_t& cph = __empty_post_handler)
-        : type(t), name(s),
-          handler(ch), args(n),
+        : block(b), name(s),
+          handler(ch),  args(n),
           post_handler(cph) {}
 
     const std::string& get_name() const { return name; }
 
     int args_count() const { return args; }
 
-    bool execute(command_vals_t v) const { return handler(v); }
+    int execute(command_vals_t v) const { return handler(v); }
 
     bool post_execute() const { return post_handler(); }
+
+    CommandBlock get_block_context() const { return block; }
 
 public:
     static bool __empty_post_handler() { return true; }
 
 private:
+    CommandBlock block;
     ModuleType type;
     std::string name;
     command_handler_t handler;

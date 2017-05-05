@@ -116,7 +116,7 @@ bool EpollModule::add_connection(Connection* c) {
 
 
 bool EpollModule::del_connection(Connection* c) {
-    if (c->get_fd() != -1) {
+    if (c->is_close()) {
         epoll_event ee;
 
         ee.events = 0;
@@ -132,13 +132,13 @@ bool EpollModule::del_connection(Connection* c) {
 
     return true;
 }
- 
+
 
 bool EpollModule::process_events() {
     int n = epoll_wait(ep, event_list, conf.epoll_events, -1);
 
     if (true) { // Todo wake up by SIGALRM
-        Clock::instance()->update(); 
+        Clock::instance()->update();
     }
 
     if (n == -1) {
@@ -162,7 +162,7 @@ bool EpollModule::process_events() {
     for (int i = 0; i < n; ++i) {
         c = static_cast<Connection*>(event_list[i].data.ptr);
 
-        if (c->get_fd() == -1) {    // Todo handle stale event
+        if (c->is_close()) {    // Todo handle stale event
             continue;
         }
 
@@ -186,7 +186,7 @@ bool EpollModule::process_events() {
         event = c->get_write_event();
 
         if ((flags & EPOLLOUT) && event->is_active()) {
-            if (c->get_fd() == -1) {    // Todo handle stale event
+            if (c->is_close()) {    // Todo handle stale event
                 continue;
             }
 
@@ -198,16 +198,14 @@ bool EpollModule::process_events() {
     return true;
 }
 
-bool EpollModule::epoll_events_handler(command_vals_t v) {
-    auto conf = ModuleManager::instance()->get_conf<EpollModule>();
+int EpollModule::epoll_events_handler(command_vals_t v) {
+    conf.epoll_events = atoi(v[0].c_str());
 
-    conf->epoll_events = atoi(v[0].c_str());
-
-    if (conf->epoll_events <= 0) {
-        return false;
+    if (conf.epoll_events <= 0) {
+        return ERROR_COMMAND;
     }
 
-    return true;
+    return NULL_BLOCK;
 }
 
 }

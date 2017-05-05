@@ -26,21 +26,24 @@ protected:
 
 struct EventModuleConf {
     int time_resolution;
-    unsigned int connections;
+    int connections;
 };
 
 class MainEventModule: public ModuleWithConf<CoreModule,
                                              EventModuleConf,
-                                             ModuleIndex::MAIN_EVENT_MODULE> {
+                                             MAIN_EVENT_MODULE> {
 public:
     MainEventModule(): ModuleWithConf(
         {
-            new Command(ModuleType::CORE_MODULE, "event",
-                        event_handler, 1),
-            new Command(ModuleType::EVENT_MODULE, "timer_resolution",
-                        timer_resolution_handler, 1),
-            new Command(ModuleType::EVENT_MODULE, "connections",
-                        connections_handler, 1),
+            new Command(CORE_BLOCK,
+                        "event",
+                        lambda_handler(event_handler), 1),
+            new Command(EVENT_BLOCK,
+                        "timer_resolution",
+                        lambda_handler(timer_resolution_handler), 1),
+            new Command(EVENT_BLOCK,
+                        "connections",
+                        lambda_handler(connections_handler), 1),
         }) {}
 
     bool init_conf() override;
@@ -49,12 +52,13 @@ public:
 
     bool init_process() override;
 
-public:
-    static bool event_handler(command_vals_t v);
+    int event_handler(command_vals_t v);
 
-    static bool timer_resolution_handler(command_vals_t v);
+    int timer_resolution_handler(command_vals_t v);
 
-    static bool connections_handler(command_vals_t);
+    int connections_handler(command_vals_t v);
+
+    static void sig_timer_handler(int sig);
 };
 
 }

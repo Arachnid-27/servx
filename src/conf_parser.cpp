@@ -7,10 +7,7 @@ namespace servx {
 ConfParser* ConfParser::parser = new ConfParser;
 
 ConfParser::~ConfParser() {
-    if (root) {
-        delete root;
-    }
-
+    delete root;
     delete[] buf;
 }
 
@@ -25,7 +22,7 @@ bool ConfParser::parse() {
     }
 
     for (auto& c : root->get_items()) {
-        if (!execute(c)) {
+        if (!process(c, CORE_BLOCK)) {
             return false;
         }
     }
@@ -33,32 +30,37 @@ bool ConfParser::parse() {
     return true;
 }
 
-bool ConfParser::execute(const ConfItem& item) {
+bool ConfParser::process(const ConfItem& item, int block) {
     auto cmd = ModuleManager::instance()->find_command(item.get_name());
+
     if (cmd == nullptr) {
+        return false;
+    }
+
+    if (cmd->get_block_context() != block) {
         return false;
     }
 
     auto c = cmd->args_count();
     auto v = item.get_values();
 
-    if (c >= 0  && static_cast<size_t>(c) != v.size()) {
+    if (c >= 0 && static_cast<size_t>(c) != v.size()) {
         return false;
     }
 
-    if (!cmd->execute(v)) {
+    int rc = cmd->execute(v);
+
+    if (rc == ERROR_COMMAND) {
         return false;
     }
 
-    auto items = item.get_items();
-
-    if (!items.empty()) {    // block command
-        for (auto& c : items) {
-            if (!execute(c)) {
+    if (rc != NULL_BLOCK) {    // block command
+        for (auto& c : item.get_items()) {
+            if (!process(c, rc)) {
                 return false;
             }
         }
-        
+
         if (!cmd->post_execute()) {
             return false;
         }

@@ -1,6 +1,7 @@
 #ifndef _EVENT_H_
 #define _EVENT_H_
 
+#include <ctime>
 #include <functional>
 
 #include "connection.h"
@@ -12,10 +13,10 @@ class Connection;
 class Event {
 public:
     Event(Connection* c, bool w)
-        : connection(c), write(w), active(0),
+        : conn(c), write(w), active(0),
           ready(0), timeout(0), timer(0) {}
 
-    Connection* get_connection() const { return connection; }
+    Connection* get_connection() const { return conn; }
 
     bool is_write_event() const { return write == 1; }
 
@@ -44,7 +45,7 @@ public:
     void handle() { handler(this); }
 
 private:
-    Connection *connection;
+    Connection *conn;
     unsigned int write:1;
     unsigned int active:1;
     unsigned int ready:1;

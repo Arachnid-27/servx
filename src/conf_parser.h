@@ -34,7 +34,7 @@ private:
 
     bool parse(ConfItem* parent);
 
-    bool execute(const ConfItem& item);
+    bool process(const ConfItem& item, int block);
 
     int next_token();
 

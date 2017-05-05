@@ -13,12 +13,13 @@ struct EpollModuleConf {
 
 class EpollModule: public ModuleWithConf<EventModule,
                           EpollModuleConf,
-                          ModuleIndex::EPOLL_MODULE> {
+                          EPOLL_MODULE> {
 public:
     EpollModule(): ModuleWithConf(
         {
-            new Command(ModuleType::EVENT_MODULE, "epoll_events",
-                        epoll_events_handler, 1)
+            new Command(EVENT_BLOCK,
+                        "epoll_events",
+                        lambda_handler(epoll_events_handler), 1)
         }) {}
 
     bool init_conf() override;
@@ -35,8 +36,7 @@ public:
 
     bool process_events() override;
 
-public:
-    static bool epoll_events_handler(command_vals_t);
+    int epoll_events_handler(command_vals_t);
 
 private:
     int ep;

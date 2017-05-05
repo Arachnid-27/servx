@@ -18,32 +18,35 @@ struct CoreModuleConf {
 
 class MainCoreModule: public ModuleWithConf<CoreModule,
                                             CoreModuleConf,
-                                            ModuleIndex::MAIN_CORE_MODULE> {
+                                            MAIN_CORE_MODULE> {
 public:
     MainCoreModule(): ModuleWithConf(
         {
-            new Command(ModuleType::CORE_MODULE, "worker",
-                        worker_handler, 1),
-            new Command(ModuleType::CORE_MODULE, "daemon",
-                        daemon_handler, 1),
-            new Command(ModuleType::CORE_MODULE, "rlimit_nofile",
-                        rlimit_nofile_handler, 1),
-            new Command(ModuleType::CORE_MODULE, "error_log",
-                        error_log_handler)
+            new Command(CORE_BLOCK,
+                        "worker",
+                        lambda_handler(worker_handler), 1),
+            new Command(CORE_BLOCK,
+                        "daemon",
+                        lambda_handler(daemon_handler), 1),
+            new Command(CORE_BLOCK,
+                        "rlimit_nofile",
+                        lambda_handler(rlimit_nofile_handler), 1),
+            new Command(CORE_BLOCK,
+                        "error_log",
+                        lambda_handler(error_log_handler))
         }) {}
 
     bool init_conf() override;
 
     bool init_module() override;
 
-public:
-    static bool worker_handler(command_vals_t v);
+    int worker_handler(command_vals_t v);
 
-    static bool daemon_handler(command_vals_t v);
+    int daemon_handler(command_vals_t v);
 
-    static bool rlimit_nofile_handler(command_vals_t v);
+    int rlimit_nofile_handler(command_vals_t v);
 
-    static bool error_log_handler(command_vals_t v);
+    int error_log_handler(command_vals_t v);
 };
 
 }

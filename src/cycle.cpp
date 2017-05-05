@@ -1,6 +1,7 @@
 #include "cycle.h"
 
 #include "conf_parser.h"
+#include "event_module.h"
 #include "module_manager.h"
 
 namespace servx {

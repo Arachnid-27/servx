@@ -6,7 +6,6 @@
 #include <queue>
 #include <vector>
 
-#include "connection.h"
 #include "clock.h"
 #include "file.h"
 #include "listening.h"
@@ -34,8 +33,6 @@ private:
     std::vector<Process> processes;
     std::vector<File> open_files;
     std::vector<Listening> listenings;
-    std::queue<Connection*> free_connections;
-    std::queue<Connection*> reusable_connections;
 
 private:
     static Cycle* cycle;
