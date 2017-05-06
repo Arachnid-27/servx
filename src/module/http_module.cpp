@@ -26,6 +26,14 @@ int MainHttpModule::address_handler(command_vals_t v) {
     return ADDRESS_BLOCK;
 }
 
+int MainHttpModule::server_name_handler(command_vals_t v) {
+    Server& server = conf.servers.back();
+    for (auto& s : v) {
+        server.push_server_name(s);
+    }
+    return NULL_BLOCK;
+}
+
 int MainHttpModule::addr_handler(command_vals_t v) {
     Server& server = conf.servers.back();
     IPAddress& address = server.get_last_address();
@@ -61,7 +69,7 @@ int MainHttpModule::reuseport_handler(command_vals_t v) {
     return NULL_BLOCK;
 }
 
-inline int MainHttpModule::set_address_value(command_vals_t& v,
+inline int MainHttpModule::set_address_value(command_vals_t v,
                                              address_setter setter) {
     Server& server = conf.servers.back();
     IPAddress& address = server.get_last_address();

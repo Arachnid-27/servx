@@ -1,12 +1,10 @@
-#ifndef _SERVER_H_
-#define _SERVER_H_
+#ifndef _INET_H_
+#define _INET_H_
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 
-#include <cstring>
-#include <vector>
 #include <string>
 
 namespace servx {
@@ -39,31 +37,6 @@ private:
     int recv_buf;
     int backlog;
     bool reuseport;
-};
-
-class Location {
-public:
-    Location(const char* s): uri(s) {}
-
-    Location(std::string s): uri(s) {}
-
-    Location(Location&&) = default;
-
-private:
-    std::string uri;
-};
-
-class Server {
-public:
-    void push_location(Location&& loc) { locations.push_back(std::move(loc)); }
-
-    void new_address() { addresses.emplace_back(); }
-
-    IPAddress& get_last_address() { return addresses.back(); }
-
-private:
-    std::vector<IPAddress> addresses;
-    std::vector<Location> locations;
 };
 
 }

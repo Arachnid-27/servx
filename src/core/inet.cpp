@@ -1,4 +1,6 @@
-#include "server.h"
+#include "inet.h"
+
+#include <cstring>
 
 namespace servx {
 

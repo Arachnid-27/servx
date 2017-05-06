@@ -24,13 +24,13 @@ protected:
         : Module(EVENT_MODULE, v) {}
 };
 
-struct EventModuleConf {
+struct MainEventConf {
     int time_resolution;
     int connections;
 };
 
 class MainEventModule: public ModuleWithConf<CoreModule,
-                                             EventModuleConf,
+                                             MainEventConf,
                                              MAIN_EVENT_MODULE> {
 public:
     MainEventModule(): ModuleWithConf(

@@ -10,14 +10,14 @@ protected:
     CoreModule(const std::initializer_list<Command*>& v): Module(CORE_MODULE, v) {}
 };
 
-struct CoreModuleConf {
+struct MainCoreConf {
     int rlimit_nofile;
     int worker;
     bool daemon;
 };
 
 class MainCoreModule: public ModuleWithConf<CoreModule,
-                                            CoreModuleConf,
+                                            MainCoreConf,
                                             MAIN_CORE_MODULE> {
 public:
     MainCoreModule(): ModuleWithConf(

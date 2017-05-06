@@ -4,24 +4,43 @@
 #include "core_module.h"
 #include "server.h"
 
-#define lambda_address_handler(func)                            \
-        [this](command_vals_t v) { return this->handler(v); }
-
 namespace servx {
 
+class HttpModuleConf {};
+
 class HttpModule: public Module {
+public:
+    virtual HttpModuleConf* create_main_conf() { return nullptr; }
+
+    virtual HttpModuleConf* create_srv_conf() { return nullptr; }
+
+    virtual HttpModuleConf* create_loc_conf() { return nullptr; }
 
 protected:
     HttpModule(const std::initializer_list<Command*>& v)
         : Module(HTTP_MODULE, v) {}
 };
 
-struct HttpModuleConf {
+template <typename Main, typename Srv, typename Loc, int Index>
+class HttpModuleWithConf: public ModuleWithConf<HttpModule, Main, Index> {
+public:
+    using main_conf_t = Main;
+    using srv_conf_t = Srv;
+    using loc_conf_t = Loc;
+
+    enum { index = Index };
+
+protected:
+    HttpModuleWithConf(const std::initializer_list<Command*>& v)
+        : HttpModule(v) {}
+};
+
+struct MainHttpConf {
     std::vector<Server> servers;
 };
 
-class MainHttpModule: public ModuleWithConf<CoreModule,
-                                            HttpModuleConf,
+class MainHttpModule: public ModuleWithConf<HttpModule,
+                                            MainHttpConf,
                                             MAIN_HTTP_MODULE> {
 public:
     MainHttpModule(): ModuleWithConf(
@@ -39,6 +58,9 @@ public:
             new Command(SERVER_BLOCK,
                         "address",
                         lambda_handler(address_handler), 0),
+            new Command(SERVER_BLOCK,
+                        "server_name",
+                        lambda_handler(server_name_handler), -1),
             new Command(ADDRESS_BLOCK,
                         "addr",
                         lambda_handler(addr_handler), 1),
@@ -67,6 +89,8 @@ public:
 
     int address_handler(command_vals_t v);
 
+    int server_name_handler(command_vals_t v);
+
     int addr_handler(command_vals_t v);
 
     int port_handler(command_vals_t v);
@@ -84,7 +108,7 @@ public:
 private:
     using address_setter = void (IPAddress::*)(int);
 
-    int set_address_value(command_vals_t& v, address_setter setter);
+    int set_address_value(command_vals_t v, address_setter setter);
 };
 
 }

@@ -101,16 +101,18 @@ protected:
     std::vector<Command*> commands;
 };
 
-template <class MT, class Conf, ModuleIndex MI>
-class ModuleWithConf: public MT {
+template <typename ModuleType, typename Conf, int Index>
+class ModuleWithConf: public ModuleType {
+public:
+    using conf_t = Conf;
+
+    enum { index = Index };
+
 public:
     Conf* get_conf() { return &conf; }
 
-public:
-    constexpr static ModuleIndex get_index() { return MI; }
-
 protected:
-    ModuleWithConf(const std::initializer_list<Command*>& v): MT(v) {}
+    ModuleWithConf(const std::initializer_list<Command*>& v): ModuleType(v) {}
 
 protected:
     Conf conf;

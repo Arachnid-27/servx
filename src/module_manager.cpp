@@ -10,13 +10,13 @@ namespace servx {
 ModuleManager* ModuleManager::manager = new ModuleManager;
 
 ModuleManager::ModuleManager() {
-    create_module(ModuleIndex::MAIN_CORE_MODULE, new MainCoreModule);
-    create_module(ModuleIndex::MAIN_EVENT_MODULE, new MainEventModule);
-    create_module(ModuleIndex::EPOLL_MODULE, new EpollModule);
-    create_module(ModuleIndex::MAIN_HTTP_MODULE, new MainHttpModule);
+    create_module(MainCoreModule::index, new MainCoreModule);
+    create_module(MainEventModule::index, new MainEventModule);
+    create_module(MainHttpModule::index, new MainHttpModule);
+    create_module(EpollModule::index, new EpollModule);
 }
 
-void ModuleManager::create_module(ModuleIndex index, Module* module) {
+void ModuleManager::create_module(int index, Module* module) {
     modules[index] = module;
     for (auto c : module->get_commands()) {
         // the lastest command will replace old command if have same name
@@ -41,5 +41,18 @@ bool ModuleManager::for_each(std::function<bool (Module*)> func) {
 
     return true;
 }
+
+HttpModuleManager::HttpModuleManager() {
+}
+
+void HttpModuleManager::create_module(int index, HttpModule* module) {
+    auto& commands = ModuleManager::manager->commands;
+    modules[index] = module;
+    for (auto c : module->get_commands()) {
+        commands[c->get_name()] = c;
+    }
+}
+
+HttpModuleManager* HttpModuleManager::manager = new HttpModuleManager;
 
 }
