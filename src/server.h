@@ -2,49 +2,28 @@
 #define _SERVER_H_
 
 #include <vector>
-#include <string>
 
-#include "inet.h"
-#include "http_module.h"
+#include "location.h"
 
 namespace servx {
 
-class HttpContext {
+class Server {
 public:
-    HttpContext(bool srv);
+    Server();
 
-    HttpModuleConf* get_conf(int index) { return confs[index]; }
-
-private:
-    HttpModuleConf* confs[NULL_HTTP_MODULE];
-};
-
-class Location: public HttpContext {
-public:
-    Location(const char* s): uri(s) {}
-
-    Location(std::string s): uri(s) {}
-
-    Location(Location&&) = default;
-
-private:
-    std::string uri;
-};
-
-class Server: public HttpContext {
-public:
     void push_server_name(std::string s) { server_names.push_back(std::move(s)); }
 
-    void push_location(Location&& loc) { locations.push_back(std::move(loc)); }
+    bool push_location(Location* loc);
 
-    void new_address() { addresses.emplace_back(); }
+    Location* serach(const std::string& uri);
 
-    IPAddress& get_last_address() { return addresses.back(); }
+    ModuleConf* get_conf(int index) { return confs[index]; }
 
 private:
     std::vector<std::string> server_names;
-    std::vector<IPAddress> addresses;
-    std::vector<Location> locations;
+    std::vector<Location*> regex_locations;
+    LocationTree prefix_locations;
+    ModuleConf* confs[NULL_MODULE];
 };
 
 }

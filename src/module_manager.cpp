@@ -42,17 +42,6 @@ bool ModuleManager::for_each(std::function<bool (Module*)> func) {
     return true;
 }
 
-HttpModuleManager::HttpModuleManager() {
-}
-
-void HttpModuleManager::create_module(int index, HttpModule* module) {
-    auto& commands = ModuleManager::manager->commands;
-    modules[index] = module;
-    for (auto c : module->get_commands()) {
-        commands[c->get_name()] = c;
-    }
-}
-
 HttpModuleManager* HttpModuleManager::manager = new HttpModuleManager;
 
 }

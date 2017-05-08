@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 
 #include <string>
+#include <vector>
 
 namespace servx {
 
@@ -14,6 +15,8 @@ public:
     IPAddress();
 
     bool set_addr(const std::string& s);
+
+    int get_port() { return addr_in.sin_port; }
 
     void set_port(int p) { addr_in.sin_port = htons(p); }
 
@@ -30,6 +33,10 @@ public:
     int get_recv_buf() const { return recv_buf; }
 
     void set_recv_buf(int s) { recv_buf = s; }
+
+    bool is_attr_equal(IPAddress* other);
+
+    bool is_addr_equal(IPAddress* other);
 
 private:
     sockaddr_in addr_in;

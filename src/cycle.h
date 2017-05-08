@@ -32,7 +32,6 @@ private:
 private:
     std::vector<Process> processes;
     std::vector<File> open_files;
-    std::vector<Listening> listenings;
 
 private:
     static Cycle* cycle;

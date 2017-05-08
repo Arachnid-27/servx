@@ -2,19 +2,18 @@
 #define _HTTP_MODULE_
 
 #include "core_module.h"
+#include "inet.h"
 #include "server.h"
 
 namespace servx {
 
-class HttpModuleConf {};
-
 class HttpModule: public Module {
 public:
-    virtual HttpModuleConf* create_main_conf() { return nullptr; }
+    virtual ModuleConf* create_main_conf() { return nullptr; }
 
-    virtual HttpModuleConf* create_srv_conf() { return nullptr; }
+    virtual ModuleConf* create_srv_conf() { return nullptr; }
 
-    virtual HttpModuleConf* create_loc_conf() { return nullptr; }
+    virtual ModuleConf* create_loc_conf() { return nullptr; }
 
 protected:
     HttpModule(const std::initializer_list<Command*>& v)
@@ -47,7 +46,8 @@ public:
         {
             new Command(CORE_BLOCK,
                         "http",
-                        lambda_handler(http_handler), 0),
+                        lambda_handler(http_handler), 0,
+                        lambda_post_handler(http_post_handler)),
             new Command(HTTP_BLOCK,
                         "server",
                         lambda_handler(server_handler), 0,
@@ -57,7 +57,8 @@ public:
                         lambda_handler(location_handler), 1),
             new Command(SERVER_BLOCK,
                         "address",
-                        lambda_handler(address_handler), 0),
+                        lambda_handler(address_handler), -1,
+                        lambda_post_handler(address_post_handler)),
             new Command(SERVER_BLOCK,
                         "server_name",
                         lambda_handler(server_name_handler), -1),
@@ -79,7 +80,7 @@ public:
             new Command(ADDRESS_BLOCK,
                         "reuseport",
                         lambda_handler(reuseport_handler), 0),
-        }) {}
+        }), addr(nullptr), default_server(false) {}
 
     int http_handler(command_vals_t v);
 
@@ -103,12 +104,20 @@ public:
 
     int reuseport_handler(command_vals_t v);
 
+    bool http_post_handler();
+
     bool server_post_handler();
+
+    bool address_post_handler();
 
 private:
     using address_setter = void (IPAddress::*)(int);
 
     int set_address_value(command_vals_t v, address_setter setter);
+
+private:
+    IPAddress *addr;
+    bool default_server;
 };
 
 }

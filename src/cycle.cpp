@@ -38,9 +38,6 @@ bool Cycle::reload() {
         }
     }
 
-    for (auto& s : listenings) {
-    }
-
     return true;
 }
 

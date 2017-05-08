@@ -101,6 +101,8 @@ protected:
     std::vector<Command*> commands;
 };
 
+class ModuleConf {};
+
 template <typename ModuleType, typename Conf, int Index>
 class ModuleWithConf: public ModuleType {
 public:
