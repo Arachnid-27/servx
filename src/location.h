@@ -1,6 +1,7 @@
 #ifndef _LOCATION_H_
 #define _LOCATION_H_
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -10,7 +11,9 @@ namespace servx {
 
 class Location {
 public:
-    Location(std::string s);
+    Location(const std::string& s);
+
+    Location(std::string&& s);
 
     const std::string& get_uri() const { return uri; }
 
@@ -24,24 +27,41 @@ private:
     ModuleConf* confs[NULL_MODULE];
 };
 
+class LocationTree;
+
 class LocationTreeNode {
+    friend class LocationTree;
+
 public:
     LocationTreeNode(): loc(nullptr) {}
 
-    Location *loc;
-    std::unordered_map<char, LocationTreeNode*> child;
+    LocationTreeNode(const LocationTree&) = delete;
+
+    LocationTree& operator=(const LocationTree&) = delete;
+
+    ~LocationTreeNode() = default;
+
+private:
+    std::shared_ptr<Location> loc;
+    std::unordered_map<char, std::shared_ptr<LocationTreeNode>> child;
 };
 
 class LocationTree {
 public:
-    LocationTree() = default;
+    LocationTree(): root(std::make_shared<LocationTreeNode>()) {}
 
-    bool push(Location *loc);
+    LocationTree(const LocationTree&) = delete;
 
-    Location* search(const std::string uri);
+    LocationTree& operator=(const LocationTree&) = delete;
+
+    ~LocationTree() = default;
+
+    bool push(std::string&& uri);
+
+    std::shared_ptr<Location> search(const std::string& uri);
 
 private:
-    LocationTreeNode root;
+    std::shared_ptr<LocationTreeNode> root;
 };
 
 }

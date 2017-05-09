@@ -35,7 +35,7 @@ protected:
 };
 
 struct MainHttpConf {
-    std::vector<Server> servers;
+    std::vector<std::shared_ptr<Server>> servers;
 };
 
 class MainHttpModule: public ModuleWithConf<HttpModule,
@@ -116,7 +116,7 @@ private:
     int set_address_value(command_vals_t v, address_setter setter);
 
 private:
-    IPAddress *addr;
+    std::shared_ptr<IPAddress> addr;
     bool default_server;
 };
 

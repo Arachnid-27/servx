@@ -13,15 +13,15 @@ public:
 
     void push_server_name(std::string s) { server_names.push_back(std::move(s)); }
 
-    bool push_location(Location* loc);
+    bool push_location(std::string uri, bool regex);
 
-    Location* serach(const std::string& uri);
+    std::shared_ptr<Location> serach(const std::string& uri);
 
     ModuleConf* get_conf(int index) { return confs[index]; }
 
 private:
     std::vector<std::string> server_names;
-    std::vector<Location*> regex_locations;
+    std::vector<std::shared_ptr<Location>> regex_locations;
     LocationTree prefix_locations;
     ModuleConf* confs[NULL_MODULE];
 };

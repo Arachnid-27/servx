@@ -4,21 +4,26 @@
 
 namespace servx {
 
-Location::Location(std::string s): uri(s) {
+Location::Location(const std::string& s): uri(s) {
     auto manager = HttpModuleManager::instance();
     for (int i = 0; i < NULL_MODULE; ++i) {
         confs[i] = manager->get_module(i)->create_loc_conf();
     }
 }
 
-bool LocationTree::push(Location *loc) {
-    auto &uri = loc->get_uri();
+Location::Location(std::string&& s): uri(std::move(s)) {
+    auto manager = HttpModuleManager::instance();
+    for (int i = 0; i < NULL_MODULE; ++i) {
+        confs[i] = manager->get_module(i)->create_loc_conf();
+    }
+}
 
+bool LocationTree::push(std::string&& uri) {
     if (uri[0] != '/') {
         return false;
     }
 
-    LocationTreeNode *node = &root;
+    std::shared_ptr<LocationTreeNode> node = root;
     auto length = uri.length();
 
     for (size_t i = 1; i != length; ++i) {
@@ -29,17 +34,17 @@ bool LocationTree::push(Location *loc) {
         return false;
     }
 
-    node->loc = loc;
+    node->loc = std::make_shared<Location>(std::move(uri));
     return true;
 }
 
-Location* LocationTree::search(const std::string uri) {
+std::shared_ptr<Location> LocationTree::search(const std::string& uri) {
     if (uri[0] != '/') {
         return nullptr;
     }
 
-    Location *result = nullptr;
-    LocationTreeNode *node = &root;
+    std::shared_ptr<Location> result = nullptr;
+    std::shared_ptr<LocationTreeNode> node = root;
 
     for (auto ch : uri) {
         auto it = node->child.find(ch);

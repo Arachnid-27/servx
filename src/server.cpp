@@ -11,16 +11,16 @@ Server::Server() {
     }
 }
 
-bool Server::push_location(Location* loc) {
-    if (loc->is_regex()) {
-        regex_locations.push_back(loc);
+bool Server::push_location(std::string uri, bool regex) {
+    if (regex) {
+        regex_locations.emplace_back(std::make_shared<Location>(std::move(uri)));
         return true;
     }
 
-    return prefix_locations.push(loc);
+    return prefix_locations.push(std::move(uri));
 }
 
-Location* Server::serach(const std::string& uri) {
+std::shared_ptr<Location> Server::serach(const std::string& uri) {
     // Todo regex_locations
 
     return prefix_locations.search(uri);

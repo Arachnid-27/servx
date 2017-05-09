@@ -5,6 +5,8 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
+#include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -14,7 +16,15 @@ class IPAddress {
 public:
     IPAddress();
 
+    IPAddress(const IPAddress&) = delete;
+
+    IPAddress& operator=(const IPAddress&) = delete;
+
+    ~IPAddress();
+
     bool set_addr(const std::string& s);
+
+    int get_fd() const { return fd; }
 
     int get_port() { return addr_in.sin_port; }
 
@@ -34,17 +44,28 @@ public:
 
     void set_recv_buf(int s) { recv_buf = s; }
 
-    bool is_attr_equal(IPAddress* other);
+    bool is_attr_equal(const std::shared_ptr<IPAddress>& other);
 
-    bool is_addr_equal(IPAddress* other);
+    bool is_addr_equal(const std::shared_ptr<IPAddress>& other);
+
+    int open_socket();
+
+private:
+    bool close_socket();
 
 private:
     sockaddr_in addr_in;
     int send_buf;
     int recv_buf;
     int backlog;
+    int fd;
     bool reuseport;
 };
+
+inline bool IPAddress::is_addr_equal(
+    const std::shared_ptr<IPAddress>& other) {
+    return memcmp(&addr_in, &other->addr_in, sizeof(sockaddr_in)) == 0;
+}
 
 }
 

@@ -10,12 +10,20 @@ int MainHttpModule::http_handler(command_vals_t v) {
 }
 
 int MainHttpModule::server_handler(command_vals_t v) {
-    conf.servers.push_back(Server());
+    conf.servers.emplace_back(new Server());
     return SERVER_BLOCK;
 }
 
 int MainHttpModule::location_handler(command_vals_t v) {
-    conf.servers.back().push_location(new Location(v[0]));
+    if (v[0][0] != '/') {
+        // Todo = ^~
+        return ERROR_COMMAND;
+    }
+
+    if (!conf.servers.back()->push_location(v[0], false)) {
+        return ERROR_COMMAND;
+    }
+
     return LOCATION_BLOCK;
 }
 
@@ -32,14 +40,14 @@ int MainHttpModule::address_handler(command_vals_t v) {
         }
     }
 
-    addr = new IPAddress();
+    addr = std::make_shared<IPAddress>();
     return ADDRESS_BLOCK;
 }
 
 int MainHttpModule::server_name_handler(command_vals_t v) {
-    Server& server = conf.servers.back();
-    for (auto& s : v) {
-        server.push_server_name(s);
+    auto &server = conf.servers.back();
+    for (auto &name : v) {
+        server->push_server_name(name);
     }
     return NULL_BLOCK;
 }
@@ -73,6 +81,7 @@ int MainHttpModule::reuseport_handler(command_vals_t v) {
 }
 
 bool MainHttpModule::http_post_handler() {
+    conf.servers.shrink_to_fit();
     return true;
 }
 
@@ -82,7 +91,7 @@ bool MainHttpModule::server_post_handler() {
 
 bool MainHttpModule::address_post_handler() {
     Listener::instance()->push_address(
-        addr, &conf.servers.back(), default_server);
+        addr, conf.servers.back(), default_server);
     addr = nullptr;
     default_server = false;
     return true;
@@ -94,7 +103,7 @@ inline int MainHttpModule::set_address_value(command_vals_t v,
     if (val <= 0) {
         return ERROR_COMMAND;
     }
-    (addr->*setter)(val);
+    ((*addr).*setter)(val);
 
     return NULL_BLOCK;
 }
