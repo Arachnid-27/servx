@@ -11,6 +11,7 @@ namespace servx {
 bool MainEventModule::init_conf() {
     conf.time_resolution = 100;
     conf.connections = 1024;
+    conf.multi_accept = false;
     return true;
 }
 
@@ -66,6 +67,11 @@ int MainEventModule::connections_handler(command_vals_t v) {
         return ERROR_COMMAND;
     }
 
+    return NULL_BLOCK;
+}
+
+int MainEventModule::multi_accept_handler(command_vals_t v) {
+    conf.multi_accept = v[0] == "on";
     return NULL_BLOCK;
 }
 

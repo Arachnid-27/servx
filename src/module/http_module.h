@@ -79,8 +79,8 @@ public:
                         lambda_handler(recv_buf_handler), 1),
             new Command(ADDRESS_BLOCK,
                         "reuseport",
-                        lambda_handler(reuseport_handler), 0),
-        }), addr(nullptr), default_server(false) {}
+                        lambda_handler(reuseport_handler), 1),
+        }) {}
 
     int http_handler(command_vals_t v);
 
@@ -111,12 +111,14 @@ public:
     bool address_post_handler();
 
 private:
-    using address_setter = void (IPAddress::*)(int);
+    using tcp_socket_setter = void (TcpSocket::*)(int);
 
-    int set_address_value(command_vals_t v, address_setter setter);
+    int set_address_value(command_vals_t v, tcp_socket_setter setter);
 
 private:
-    std::shared_ptr<IPAddress> addr;
+    std::shared_ptr<TcpSocket> tcp_socket;
+    std::string addr;
+    std::string port;
     bool default_server;
 };
 

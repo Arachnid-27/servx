@@ -1,25 +1,21 @@
 #ifndef _CONNECTION_POLL_
 #define _CONNECTION_POLL_
 
-#include <memory>
-#include <queue>
+#include <vector>
 
 #include "connection.h"
 
 namespace servx {
 
-class ConnectionDeleter {
-public:
-    void operator()(Connection* conn);
-};
-
 class ConnectionPool {
-    friend class ConnectionDeleter;
-
 public:
+    ConnectionPool(const ConnectionPool&) = delete;
+
+    ConnectionPool& operator=(const ConnectionPool&) = delete;
+
     ~ConnectionPool();
 
-    void init(int size);
+    void init(size_t sz);
 
     Connection* get_connection(int fd);
 
@@ -28,10 +24,11 @@ public:
     static ConnectionPool* instance() { return pool; }
 
 private:
-    ConnectionPool() {}
+    ConnectionPool(): pool_start(nullptr) {}
 
 private:
-    std::queue<Connection*> free_connections;
+    Connection *pool_start;
+    std::vector<Connection*> free_connections;
 
     static ConnectionPool *pool;
 };

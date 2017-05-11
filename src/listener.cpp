@@ -15,7 +15,7 @@ bool Listening::push_server(const std::shared_ptr<Server>& server, bool def) {
 
 Listener* Listener::listener = new Listener;
 
-bool Listener::push_address(const std::shared_ptr<IPAddress>& addr,
+bool Listener::push_address(const std::shared_ptr<TcpSocket>& addr,
                             const std::shared_ptr<Server>& server, bool def) {
     auto &vec = addresses[addr->get_port()];
 
@@ -60,6 +60,54 @@ bool Listener::init_reuseport_listenings() {
             return false;
         }
     }
+    return true;
+}
+
+bool Listener::enable_all() {
+    Connection *conn;
+
+    for (auto &lst : listenings) {
+        conn = lst->get_connection();
+        if (conn == nullptr || conn->get_read_event()->is_active()) {
+            continue;
+        }
+
+        // Todo add to epoll
+    }
+
+    for (auto &lst : reuseport_listenings) {
+        conn = lst->get_connection();
+        if (conn == nullptr || conn->get_read_event()->is_active()) {
+            continue;
+        }
+
+        // Todo add to epoll
+    }
+
+    return true;
+}
+
+bool Listener::disable_all() {
+    Connection *conn;
+
+    for (auto &lst : listenings) {
+        conn = lst->get_connection();
+        if (conn == nullptr || !conn->get_read_event()->is_active()) {
+            continue;
+        }
+
+        // Todo delete from epoll
+    }
+
+    for (auto &lst : reuseport_listenings) {
+        conn = lst->get_connection();
+        if (conn == nullptr || !conn->get_read_event()->is_active()) {
+            continue;
+        }
+
+        // Todo delete from epoll
+    }
+
     return true;
 }
 

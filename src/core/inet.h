@@ -12,23 +12,46 @@
 
 namespace servx {
 
-class IPAddress {
+class IPSockAddr {
 public:
-    IPAddress();
+    IPSockAddr() = default;
 
-    IPAddress(const IPAddress&) = delete;
+    IPSockAddr(const IPSockAddr&) = delete;
+    IPSockAddr(IPSockAddr&&) = delete;
+    IPSockAddr& operator=(const IPSockAddr&) = delete;
+    IPSockAddr& operator==(IPSockAddr&&) = delete;
 
-    IPAddress& operator=(const IPAddress&) = delete;
+    ~IPSockAddr() = default;
 
-    ~IPAddress();
+    void set_addr(sockaddr *sa, uint8_t len);
+
+    sockaddr* get_sockaddr() { return reinterpret_cast<sockaddr*>(addr); }
+
+    uint8_t get_length() const { return length; }
+
+    uint16_t get_port() const;
+
+private:
+    uint8_t length;
+    char addr[sizeof(sockaddr_in6)];
+};
+
+class TcpSocket {
+public:
+    TcpSocket();
+
+    TcpSocket(const TcpSocket&) = delete;
+    TcpSocket(TcpSocket&&) = delete;
+    TcpSocket& operator=(const TcpSocket&) = delete;
+    TcpSocket& operator=(TcpSocket&&) = delete;
+
+    ~TcpSocket();
 
     bool set_addr(const std::string& s);
 
     int get_fd() const { return fd; }
 
-    int get_port() { return addr_in.sin_port; }
-
-    void set_port(int p) { addr_in.sin_port = htons(p); }
+    uint16_t get_port() { return addr.get_port(); }
 
     void set_backlog(int s) { backlog = s; }
 
@@ -44,9 +67,11 @@ public:
 
     void set_recv_buf(int s) { recv_buf = s; }
 
-    bool is_attr_equal(const std::shared_ptr<IPAddress>& other);
+    bool init_addr(const std::string& s, const std::string& port);
 
-    bool is_addr_equal(const std::shared_ptr<IPAddress>& other);
+    bool is_attr_equal(const std::shared_ptr<TcpSocket>& other);
+
+    bool is_addr_equal(const std::shared_ptr<TcpSocket>& other);
 
     int open_socket();
 
@@ -54,7 +79,7 @@ private:
     bool close_socket();
 
 private:
-    sockaddr_in addr_in;
+    IPSockAddr addr;
     int send_buf;
     int recv_buf;
     int backlog;
@@ -62,9 +87,9 @@ private:
     bool reuseport;
 };
 
-inline bool IPAddress::is_addr_equal(
-    const std::shared_ptr<IPAddress>& other) {
-    return memcmp(&addr_in, &other->addr_in, sizeof(sockaddr_in)) == 0;
+inline bool TcpSocket::is_addr_equal(
+    const std::shared_ptr<TcpSocket>& other) {
+    return memcmp(&addr, &other->addr, sizeof(sockaddr_in)) == 0;
 }
 
 }

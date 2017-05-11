@@ -2,33 +2,34 @@
 
 namespace servx {
 
-void ConnectionDeleter::operator()(Connection* conn) {
-    conn->close();
-    ConnectionPool::pool->ret_connection(conn);
+ConnectionPool::~ConnectionPool() {
+    delete[] pool_start;
 }
 
 ConnectionPool* ConnectionPool::pool = new ConnectionPool;
 
-void ConnectionPool::init(int size) {
-    Connection *conns = new Connection[size];
-    std::deque<Connection*> temp(size);
-
-    for (auto& c : temp) {
-        c = (conns++);
+void ConnectionPool::init(size_t sz) {
+    if (pool_start) {
+        // err_log
+        return;
     }
-    free_connections = std::queue<Connection*>(temp);
+
+    pool_start = new Connection[sz];
+    free_connections = std::vector<Connection*>(sz);
+    for (size_t i = 0; i < sz; ++i) {
+        free_connections[i] = pool_start + i;
+    }
 }
 
 Connection* ConnectionPool::get_connection(int fd) {
-    Connection *conn = free_connections.front();
-    auto ptr = std::shared_ptr<Connection>(conn, ConnectionDeleter());
+    auto conn = free_connections.back();
+    free_connections.pop_back();
     conn->open(fd);
-    free_connections.pop();
     return conn;
 }
 
 void ConnectionPool::ret_connection(Connection* conn) {
-    free_connections.push(conn);
+    free_connections.push_back(conn);
 }
 
 }

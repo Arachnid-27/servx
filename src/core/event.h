@@ -3,6 +3,7 @@
 
 #include <ctime>
 #include <functional>
+#include <memory>
 
 #include "connection.h"
 
@@ -26,9 +27,9 @@ public:
 
     bool is_timer() const { return timer != 0; }
 
-    std::time_t get_timer() const { return timer; }
+    time_t get_timer() const { return timer; }
 
-    void set_timer(std::time_t t) { timer = t; }
+    void set_timer(time_t t) { timer = t; }
 
     bool is_ready() const { return ready; }
 
@@ -40,17 +41,18 @@ public:
         timer = 0;
         timeout = 1;
         handler(this);
+        timeout = 0;
     }
 
     void handle() { handler(this); }
 
 private:
-    Connection *conn;
-    unsigned int write:1;
-    unsigned int active:1;
-    unsigned int ready:1;
-    unsigned int timeout:1;
-    std::time_t timer;
+    Connection* conn;
+    uint32_t write:1;
+    uint32_t active:1;
+    uint32_t ready:1;
+    uint32_t timeout:1;
+    time_t timer;
     std::function<void(Event*)> handler;
 };
 

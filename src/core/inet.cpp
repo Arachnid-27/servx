@@ -1,38 +1,66 @@
 #include "inet.h"
 
 #include <errno.h>
+#include <netdb.h>
 #include <unistd.h>
 
 namespace servx {
 
-IPAddress::IPAddress()
-    : send_buf(-1), recv_buf(-1),
-      backlog(5), fd(-1), reuseport(false) {
-        memset(&addr_in, 0, sizeof(in_addr));
+void IPSockAddr::set_addr(sockaddr *sa, uint8_t len) {
+    memcpy(addr, sa, len);
+    length = len;
+}
+
+uint16_t IPSockAddr::get_port() const {
+    auto p = reinterpret_cast<const sockaddr*>(addr);
+
+    if (p->sa_family == AF_INET6) {
+        return reinterpret_cast<const sockaddr_in6*>(addr)->sin6_port;
     }
 
-IPAddress::~IPAddress() {
+    return reinterpret_cast<const sockaddr_in*>(addr)->sin_port;
+}
+
+TcpSocket::TcpSocket()
+    : send_buf(-1), recv_buf(-1),
+      backlog(5), fd(-1), reuseport(false) {}
+
+TcpSocket::~TcpSocket() {
     if (fd != -1) {
         close_socket();
     }
 }
 
-bool IPAddress::set_addr(const std::string& s) {
-    if (inet_pton(AF_INET, s.c_str(), &addr_in.sin_addr) == -1) {
+bool TcpSocket::init_addr(const std::string& s, const std::string& port) {
+    addrinfo *res;
+    addrinfo hint;
+
+    memset(&hint, 0, sizeof(addrinfo));
+    hint.ai_family = AF_UNSPEC;
+    hint.ai_socktype = SOCK_STREAM;
+    hint.ai_flags = AI_ADDRCONFIG | AI_NUMERICHOST | AI_NUMERICSERV;
+
+    if (getaddrinfo(s.c_str(), port.c_str(), &hint, &res) == -1) {
         // err_log
         return false;
     }
+
+    // just use the first one
+    addr.set_addr(res->ai_addr, res->ai_addrlen);
+
+    freeaddrinfo(res);
+
     return true;
 }
 
-bool IPAddress::is_attr_equal(const std::shared_ptr<IPAddress>& other) {
+bool TcpSocket::is_attr_equal(const std::shared_ptr<TcpSocket>& other) {
     return send_buf == other->send_buf &&
            recv_buf == other->recv_buf &&
            backlog == other->backlog &&
            reuseport == other->reuseport;
 }
 
-int IPAddress::open_socket() {
+int TcpSocket::open_socket() {
     if (fd != -1) {
         return fd;
     }
@@ -61,8 +89,7 @@ int IPAddress::open_socket() {
             }
         }
 
-        if (bind(fd, reinterpret_cast<sockaddr *>(&addr_in),
-                 sizeof(sockaddr_in)) == -1) {
+        if (bind(fd, addr.get_sockaddr(), addr.get_length()) == -1) {
             if (errno == EADDRINUSE) {  // retry
                 continue;
             }
@@ -93,7 +120,7 @@ int IPAddress::open_socket() {
     return -1;
 }
 
-bool IPAddress::close_socket() {
+bool TcpSocket::close_socket() {
     if (close(fd) == -1) {
         // err_log
         return false;

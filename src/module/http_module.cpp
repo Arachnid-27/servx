@@ -28,10 +28,6 @@ int MainHttpModule::location_handler(command_vals_t v) {
 }
 
 int MainHttpModule::address_handler(command_vals_t v) {
-    if (addr != nullptr) {
-        return ERROR_COMMAND;
-    }
-
     if (v.size() != 0) {
         if (v.size() == 1 && v[0] == "default") {
             default_server = true;
@@ -40,7 +36,10 @@ int MainHttpModule::address_handler(command_vals_t v) {
         }
     }
 
-    addr = std::make_shared<IPAddress>();
+    addr = "*";
+    port = "80";
+    default_server = false;
+    tcp_socket = std::make_shared<TcpSocket>();
     return ADDRESS_BLOCK;
 }
 
@@ -53,30 +52,29 @@ int MainHttpModule::server_name_handler(command_vals_t v) {
 }
 
 int MainHttpModule::addr_handler(command_vals_t v) {
-    if (!addr->set_addr(v[0])) {
-        return ERROR_COMMAND;
-    }
+    addr = v[0];
     return NULL_BLOCK;
 }
 
 int MainHttpModule::port_handler(command_vals_t v) {
-    return set_address_value(v, &IPAddress::set_port);
+    port = v[0];
+    return NULL_BLOCK;
 }
 
 int MainHttpModule::backlog_handler(command_vals_t v) {
-    return set_address_value(v, &IPAddress::set_backlog);
+    return set_address_value(v, &TcpSocket::set_backlog);
 }
 
 int MainHttpModule::send_buf_handler(command_vals_t v) {
-    return set_address_value(v, &IPAddress::set_send_buf);
+    return set_address_value(v, &TcpSocket::set_send_buf);
 }
 
 int MainHttpModule::recv_buf_handler(command_vals_t v) {
-    return set_address_value(v, &IPAddress::set_recv_buf);
+    return set_address_value(v, &TcpSocket::set_recv_buf);
 }
 
 int MainHttpModule::reuseport_handler(command_vals_t v) {
-    addr->set_reuseport(true);
+    tcp_socket->set_reuseport(v[0] == "true");
     return NULL_BLOCK;
 }
 
@@ -90,20 +88,21 @@ bool MainHttpModule::server_post_handler() {
 }
 
 bool MainHttpModule::address_post_handler() {
+    if (!tcp_socket->init_addr(addr, port)) {
+        return false;
+    }
     Listener::instance()->push_address(
-        addr, conf.servers.back(), default_server);
-    addr = nullptr;
-    default_server = false;
+        tcp_socket, conf.servers.back(), default_server);
     return true;
 }
 
 inline int MainHttpModule::set_address_value(command_vals_t v,
-                                             address_setter setter) {
+                                             tcp_socket_setter setter) {
     int val = atoi(v[0].c_str());
     if (val <= 0) {
         return ERROR_COMMAND;
     }
-    ((*addr).*setter)(val);
+    ((*tcp_socket).*setter)(val);
 
     return NULL_BLOCK;
 }

@@ -27,6 +27,7 @@ protected:
 struct MainEventConf {
     int time_resolution;
     int connections;
+    bool multi_accept;
 };
 
 class MainEventModule: public ModuleWithConf<CoreModule,
@@ -44,6 +45,9 @@ public:
             new Command(EVENT_BLOCK,
                         "connections",
                         lambda_handler(connections_handler), 1),
+            new Command(EVENT_BLOCK,
+                        "multi_accept",
+                        lambda_handler(multi_accept_handler), 1)
         }) {}
 
     bool init_conf() override;
@@ -57,6 +61,8 @@ public:
     int timer_resolution_handler(command_vals_t v);
 
     int connections_handler(command_vals_t v);
+
+    int multi_accept_handler(command_vals_t v);
 
     static void sig_timer_handler(int sig);
 };

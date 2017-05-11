@@ -7,17 +7,18 @@ namespace servx {
 Server::Server() {
     auto manager = HttpModuleManager::instance();
     for (int i = 0; i < NULL_MODULE; ++i) {
-        confs[i] = manager->get_module(i)->create_srv_conf();
+        confs[i] = std::unique_ptr<ModuleConf>(
+            manager->get_module(i)->create_srv_conf());
     }
 }
 
-bool Server::push_location(std::string uri, bool regex) {
+bool Server::push_location(const std::string& uri, bool regex) {
     if (regex) {
-        regex_locations.emplace_back(std::make_shared<Location>(std::move(uri)));
+        regex_locations.emplace_back(std::make_shared<Location>(uri));
         return true;
     }
 
-    return prefix_locations.push(std::move(uri));
+    return prefix_locations.push(uri);
 }
 
 std::shared_ptr<Location> Server::serach(const std::string& uri) {
