@@ -7,8 +7,10 @@ namespace servx {
 Server::Server() {
     auto manager = HttpModuleManager::instance();
     for (int i = 0; i < NULL_MODULE; ++i) {
-        confs[i] = std::unique_ptr<ModuleConf>(
-            manager->get_module(i)->create_srv_conf());
+        auto module = manager->get_module(i);
+        if (module != nullptr) {
+            confs[i] = std::unique_ptr<ModuleConf>(module->create_srv_conf());
+        }
     }
 }
 

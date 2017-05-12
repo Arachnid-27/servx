@@ -1,3 +1,4 @@
 servx
 *.o
 *.swp
+log/

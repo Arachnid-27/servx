@@ -7,8 +7,10 @@ namespace servx {
 Location::Location(const std::string& s): uri(s) {
     auto manager = HttpModuleManager::instance();
     for (int i = 0; i < NULL_MODULE; ++i) {
-        confs[i] = std::unique_ptr<ModuleConf>(
-            manager->get_module(i)->create_loc_conf());
+        auto module = manager->get_module(i);
+        if (module != nullptr) {
+            confs[i] = std::unique_ptr<ModuleConf>(module->create_loc_conf());
+        }
     }
 }
 
@@ -19,12 +21,18 @@ bool LocationTree::push(const std::string& uri) {
 
     LocationTreeNode* node = root.get();
     auto length = uri.length();
+    decltype(node->child.find(0)) it;
 
-    for (size_t i = 1; i != length; ++i) {
+    for (size_t i = 1; i < length; ++i) {
+        it = node->child.find(uri[i]);
+        if (it == node->child.end()) {
+            node->child[uri[i]] =
+                std::unique_ptr<LocationTreeNode>(new LocationTreeNode());
+        }
         node = (node->child[uri[i]]).get();
     }
 
-    if (node->loc != nullptr) {
+    if ((node->loc) != nullptr) {
         return false;
     }
 

@@ -16,7 +16,6 @@ public:
 
     bool parse();
 
-public:
     static ConfParser* instance() { return parser; }
 
 private:
@@ -32,7 +31,9 @@ private:
 private:
     ConfParser(): buf(new char[1024]) {};
 
-    bool parse(ConfItem* parent);
+    bool parse_item(ConfItem* parent);
+
+    bool parse_value(ConfItem* item);
 
     bool process(const ConfItem& item, int block);
 
@@ -44,7 +45,6 @@ private:
     char *buf;
     int len;
 
-private:
     static ConfParser* parser;
 };
 

@@ -2,7 +2,6 @@
 
 #include <sys/resource.h>
 
-#include "cycle.h"
 #include "logger.h"
 #include "module_manager.h"
 
@@ -22,7 +21,7 @@ bool MainCoreModule::init_module() {
         rlmt.rlim_max = conf.rlimit_nofile;
 
         if (setrlimit(RLIMIT_NOFILE, &rlmt) == -1) {
-            // error_log
+            Logger::instance()->warn("setrlimit() failed, ignore");
         }
     }
 

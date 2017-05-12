@@ -13,8 +13,8 @@ namespace servx {
 
 class Listening {
 public:
-    Listening(const std::shared_ptr<TcpSocket>& addr)
-        : conn(nullptr), address(addr) {}
+    Listening(const std::shared_ptr<TcpSocket>& s)
+        : conn(nullptr), socket(s) {}
 
     Listening(const Listening&) = delete;
     Listening(Listening&&) = delete;
@@ -23,7 +23,7 @@ public:
 
     ~Listening() = default;
 
-    bool open_socket() { return address->open_socket() != -1; }
+    bool open_socket() { return socket->open_socket() != -1; }
 
     bool push_server(const std::shared_ptr<Server>& server, bool def);
 
@@ -31,7 +31,7 @@ public:
 
     bool is_attr_equal(const std::shared_ptr<TcpSocket>& addr) const;
 
-    int get_fd() const { return address->get_fd(); }
+    int get_fd() const { return socket->get_fd(); }
 
     void set_connection(Connection* c) { conn = c; }
 
@@ -41,7 +41,7 @@ private:
     Connection *conn;
     std::shared_ptr<Server> default_server;
     std::vector<std::shared_ptr<Server>> servers;
-    std::shared_ptr<TcpSocket> address;
+    std::shared_ptr<TcpSocket> socket;
 };
 
 class Listener {
@@ -59,6 +59,8 @@ public:
     bool init_listenings();
 
     bool init_reuseport_listenings();
+
+    bool set_connection_to_listenings();
 
     bool enable_all();
 
@@ -79,13 +81,13 @@ private:
 };
 
 inline bool Listening::is_addr_equal(
-    const std::shared_ptr<TcpSocket>& addr) const {
-    return address->is_addr_equal(addr);
+    const std::shared_ptr<TcpSocket>& s) const {
+    return socket->is_addr_equal(s);
 }
 
 inline bool Listening::is_attr_equal(
-    const std::shared_ptr<TcpSocket>& addr) const {
-    return address->is_attr_equal(addr);
+    const std::shared_ptr<TcpSocket>& s) const {
+    return socket->is_attr_equal(s);
 }
 
 }

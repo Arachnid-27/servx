@@ -44,7 +44,7 @@ void Logger::open_files() {
 
     while (iter != files.end()) {
         if (iter->open(flags, mode) != 0) {
-            warn("open %s flie failed, ignore", iter->get_pathname().c_str());
+            warn("open %s failed, ignore", iter->get_pathname().c_str());
             iter = files.erase(iter);
         } else {
             ++iter;
@@ -54,7 +54,6 @@ void Logger::open_files() {
     if (!files.empty()) {
         open = true;
     }
-
     files.shrink_to_fit();
 }
 

@@ -52,11 +52,13 @@ private:
 
 class LocationTree {
 public:
-    LocationTree(): root(std::unique_ptr<LocationTreeNode>()) {}
+    LocationTree()
+        : root(std::unique_ptr<LocationTreeNode>(new LocationTreeNode())) {}
 
     LocationTree(const LocationTree&) = delete;
-
+    LocationTree(LocationTree&&) = delete;
     LocationTree& operator=(const LocationTree&) = delete;
+    LocationTree& operator=(LocationTree&&) = delete;
 
     ~LocationTree() = default;
 

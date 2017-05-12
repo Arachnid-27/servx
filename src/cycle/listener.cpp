@@ -2,6 +2,7 @@
 
 #include "connection_pool.h"
 #include "event_module.h"
+#include "logger.h"
 
 namespace servx {
 
@@ -49,41 +50,44 @@ bool Listener::push_address(const std::shared_ptr<TcpSocket>& addr,
 }
 
 bool Listener::init_listenings() {
-    Connection *conn;
-
     for (auto &lst : listenings) {
         if (!lst->open_socket()) {
+            Logger::instance()->error("open socket failed");
             return false;
         }
-
-        conn = ConnectionPool::instance()
-            ->get_connection(lst->get_fd(), true);
-
-        if (conn == nullptr) {
-            return false;
-        }
-
-        lst->set_connection(conn);
     }
 
     return true;
 }
 
 bool Listener::init_reuseport_listenings() {
-    Connection *conn;
-
     for (auto &lst : reuseport_listenings) {
         if (!lst->open_socket()) {
+            Logger::instance()->error("open socket failed");
             return false;
         }
+    }
 
-        conn = ConnectionPool::instance()
-            ->get_connection(lst->get_fd(), true);
+    return true;
+}
 
+bool Listener::set_connection_to_listenings() {
+    auto pool = ConnectionPool::instance();
+    Connection *conn;
+
+    for (auto &lst : listenings) {
+        conn = pool->get_connection(lst->get_fd(), true);
         if (conn == nullptr) {
             return false;
         }
+        lst->set_connection(conn);
+    }
 
+    for (auto &lst : reuseport_listenings) {
+        conn = pool->get_connection(lst->get_fd(), true);
+        if (conn == nullptr) {
+            return false;
+        }
         lst->set_connection(conn);
     }
 

@@ -1,5 +1,6 @@
 #include "conf_parser.h"
 
+#include "logger.h"
 #include "module_manager.h"
 
 namespace servx {
@@ -17,11 +18,11 @@ bool ConfParser::parse() {
     }
 
     root = new ConfItem("");
-    if (!parse(root)) {
+    if (!parse_item(root)) {
         return false;
     }
 
-    for (auto& c : root->get_items()) {
+    for (auto &c : root->get_items()) {
         if (!process(c, CORE_BLOCK)) {
             return false;
         }
@@ -45,6 +46,8 @@ bool ConfParser::process(const ConfItem& item, int block) {
     auto v = item.get_values();
 
     if (c >= 0 && static_cast<size_t>(c) != v.size()) {
+        Logger::instance()->error("%s have %d arguments, except %d",
+            item.get_name().c_str(), c, v.size());
         return false;
     }
 
@@ -77,67 +80,68 @@ bool ConfParser::open(const char *pathname) {
     return conf_file->open(O_RDONLY);
 }
 
-bool ConfParser::parse(ConfItem *parent) {
+bool ConfParser::parse_item(ConfItem *parent) {
     ConfItem *item = nullptr;
 
     while (1) {
         switch (next_token()) {
         case STATE_OK:
             buf[len] = '\0';
-            if (item == nullptr) {
-                item = parent->gen_sub_item(buf);
-            } else {
-                item->push_value(buf);
-            }
+            item = parent->gen_sub_item(buf);
+            parse_value(item);
             break;
         case STATE_ERROR:
             return false;
         case STATE_END:
-            if (item == nullptr) {
-                if (len != 0) {
-                    item = parent->gen_sub_item(buf);
-                    break;
-                }
-                return false;   // only ';'
+            if (len == 0) {
+                return false;
             }
+            buf[len] = '\0';
+            item = parent->gen_sub_item(buf);
+            parse_value(item);
+            break;
+        case STATE_FINISTH:
+            return len == 0 && parent == root;
+        case STATE_BLOCK_START:
+            if (len == 0) {
+                return false;
+            }
+            buf[len] = '\0';
+            item = parent->gen_sub_item(buf);
+            if (!parse_item(item)) {
+                return false;
+            }
+            break;
+        case STATE_BLOCK_END:   // must end with '; }' or keep block empty
+            return len == 0;
+        }
+    }
 
-            if (len != 0) {         // end with '[token];' && do nothing if end with '[token] ;'
+    return true;
+}
+
+bool ConfParser::parse_value(ConfItem* item) {
+    while (1) {
+        switch (next_token()) {
+        case STATE_OK:
+            buf[len] = '\0';
+            item->push_value(buf);
+            break;
+        case STATE_END:
+            if (len != 0) {
                 buf[len] = '\0';
                 item->push_value(buf);
             }
-
-            item = nullptr;
-            break;
-        case STATE_FINISTH:
-            if (item != nullptr || parent != root) {
-                // Todo delete item;
-                return false;
-            }
-
             return true;
         case STATE_BLOCK_START:
-            if (item == nullptr) {  // do nothing if start with '[token] {'
-                if (len != 0) {     // start with '[token]{'
-                    buf[len] = '\0';
-                    item = parent->gen_sub_item(buf);
-                } else {            // start with only '{'
-                    return false;
-                }
-            }
-
-            if (!parse(item)) {
+            if (!parse_item(item)) {
                 return false;
             }
-
-            item = nullptr;
-            break;
-        case STATE_BLOCK_END:   // must end with '; }' or keep block empty
-            if (parent == root || item != nullptr) {
-                // Todo delete item;
-                return false;
-            }
-
             return true;
+        case STATE_ERROR:
+        case STATE_FINISTH:
+        case STATE_BLOCK_END:
+            return false;
         }
     }
 

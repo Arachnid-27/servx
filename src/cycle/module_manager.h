@@ -81,8 +81,11 @@ inline typename T::main_conf_t* HttpModuleManager::get_loc_conf(
 }
 
 inline HttpModule* HttpModuleManager::get_module(int index) const {
-    return reinterpret_cast<HttpModule*>(
-            ModuleManager::instance()->get_module(index));
+    Module *module = ModuleManager::instance()->get_module(index);
+    if (module->get_type() != HTTP_MODULE) {
+        return nullptr;
+    }
+    return reinterpret_cast<HttpModule*>(module);
 }
 
 

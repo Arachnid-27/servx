@@ -26,8 +26,6 @@ enum LogLevel {
 
 class Logger {
 public:
-    Logger(): pid(getpid()), std_err(STDERR_FILENO), open(false) {}
-
     Logger(const Logger&) = delete;
     Logger(Logger&&) = delete;
     Logger& operator=(const Logger&) = delete;
@@ -48,6 +46,8 @@ public:
     static Logger* instance() { return logger; }
 
 private:
+    Logger(): pid(getpid()), std_err(STDERR_FILENO), open(false) {}
+
     void log(const char* level, const char* fmt, va_list args);
 
 private:
