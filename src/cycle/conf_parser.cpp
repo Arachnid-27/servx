@@ -7,18 +7,12 @@ namespace servx {
 
 ConfParser* ConfParser::parser = new ConfParser;
 
-ConfParser::~ConfParser() {
-    delete root;
-    delete[] buf;
-}
-
 bool ConfParser::parse() {
     if (conf_file == nullptr) {
         return false;
     }
 
-    root = new ConfItem("");
-    if (!parse_item(root)) {
+    if (!parse_item(root.get())) {
         return false;
     }
 
@@ -35,10 +29,14 @@ bool ConfParser::process(const ConfItem& item, int block) {
     auto cmd = ModuleManager::instance()->find_command(item.get_name());
 
     if (cmd == nullptr) {
+        Logger::instance()->error("can not find command %s",
+            item.get_name().c_str());
         return false;
     }
 
     if (cmd->get_block_context() != block) {
+        Logger::instance()->error("block context error for %s",
+            item.get_name().c_str());
         return false;
     }
 
@@ -47,7 +45,7 @@ bool ConfParser::process(const ConfItem& item, int block) {
 
     if (c >= 0 && static_cast<size_t>(c) != v.size()) {
         Logger::instance()->error("%s have %d arguments, except %d",
-            item.get_name().c_str(), c, v.size());
+            item.get_name().c_str(), v.size(), c);
         return false;
     }
 
@@ -73,10 +71,8 @@ bool ConfParser::process(const ConfItem& item, int block) {
 }
 
 bool ConfParser::open(const char *pathname) {
-    if (conf_file != nullptr) {
-        delete conf_file;
-    }
-    conf_file = new File(pathname);
+    conf_file = std::unique_ptr<File>(new File(pathname));
+    root = std::unique_ptr<ConfItem>(new ConfItem(""));
     return conf_file->open(O_RDONLY);
 }
 
@@ -86,34 +82,32 @@ bool ConfParser::parse_item(ConfItem *parent) {
     while (1) {
         switch (next_token()) {
         case STATE_OK:
-            buf[len] = '\0';
             item = parent->gen_sub_item(buf);
-            parse_value(item);
+            if (!parse_value(item)) {
+                return false;
+            }
             break;
         case STATE_ERROR:
             return false;
-        case STATE_END:
-            if (len == 0) {
+        case STATE_END: // [token];
+            if (*buf == '\0') { // only ';'
                 return false;
             }
-            buf[len] = '\0';
             item = parent->gen_sub_item(buf);
-            parse_value(item);
             break;
         case STATE_FINISTH:
-            return len == 0 && parent == root;
+            return parent == root.get();
         case STATE_BLOCK_START:
-            if (len == 0) {
+            if (*buf == '\0') { // only '{'
                 return false;
             }
-            buf[len] = '\0';
             item = parent->gen_sub_item(buf);
             if (!parse_item(item)) {
                 return false;
             }
             break;
         case STATE_BLOCK_END:   // must end with '; }' or keep block empty
-            return len == 0;
+            return true;
         }
     }
 
@@ -124,12 +118,10 @@ bool ConfParser::parse_value(ConfItem* item) {
     while (1) {
         switch (next_token()) {
         case STATE_OK:
-            buf[len] = '\0';
             item->push_value(buf);
             break;
         case STATE_END:
-            if (len != 0) {
-                buf[len] = '\0';
+            if (*buf != '\0') {
                 item->push_value(buf);
             }
             return true;
@@ -150,8 +142,7 @@ bool ConfParser::parse_value(ConfItem* item) {
 
 int ConfParser::next_token() {
     char ch;
-
-    len = 0;
+    uint16_t len = 0;
 
     while (1) {
         // Todo return -1
@@ -172,12 +163,15 @@ int ConfParser::next_token() {
         case '\t':
         case ' ':
             if (len != 0) {
+                buf[len] = '\0';
                 return STATE_OK;
             }
             break;
         case ';':
+            buf[len] = '\0';
             return STATE_END;
         case '{':
+            buf[len] = '\0';
             return STATE_BLOCK_START;
         case '}':
             if (len != 0) {

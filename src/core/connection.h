@@ -21,13 +21,15 @@ public:
 
     ~Connection() = default;
 
-    void open(int fd, bool lst = false);
+    bool open(int fd, bool lst = false);
 
     void close();
 
     bool is_close() const { return socket_fd == -1; }
 
     void set_peer_sockaddr(sockaddr* sa, socklen_t len);
+
+    sockaddr* get_local_sockaddr() { return local_addr.get_sockaddr(); }
 
     int get_fd() const { return socket_fd; }
 
@@ -43,6 +45,7 @@ private:
     uint64_t conn_id;
     int socket_fd;
     IPSockAddr peer_addr;
+    IPSockAddr local_addr;
     Event *read_event;
     Event *write_event;
     bool listen;

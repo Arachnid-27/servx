@@ -40,7 +40,7 @@ public:
         {
             new Command(CORE_BLOCK,
                         "event",
-                        lambda_handler(event_handler), 1),
+                        lambda_handler(event_handler), 0),
             new Command(EVENT_BLOCK,
                         "timer_resolution",
                         lambda_handler(timer_resolution_handler), 1),

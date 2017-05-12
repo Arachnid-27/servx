@@ -1,23 +1,14 @@
 #ifndef _CONF_PARSER_H_
 #define _CONF_PARSER_H_
 
+#include <memory>
+
 #include "conf.h"
 #include "file.h"
 
 namespace servx {
 
 class ConfParser {
-public:
-    ConfParser(const ConfParser&) = delete;
-
-    ~ConfParser();
-
-    bool open(const char *pathname);
-
-    bool parse();
-
-    static ConfParser* instance() { return parser; }
-
 private:
     enum {
         STATE_OK = 0,
@@ -28,8 +19,22 @@ private:
         STATE_BLOCK_END = 5
     };
 
+public:
+    ConfParser(const ConfParser&) = delete;
+    ConfParser(ConfParser&&) = delete;
+    ConfParser& operator=(const ConfParser&) = delete;
+    ConfParser& operator=(ConfParser&&) = delete;
+
+    ~ConfParser() = default;
+
+    bool open(const char *pathname);
+
+    bool parse();
+
+    static ConfParser* instance() { return parser; }
+
 private:
-    ConfParser(): buf(new char[1024]) {};
+    ConfParser() = default;
 
     bool parse_item(ConfItem* parent);
 
@@ -40,10 +45,9 @@ private:
     int next_token();
 
 private:
-    File *conf_file;
-    ConfItem *root;
-    char *buf;
-    int len;
+    std::unique_ptr<File> conf_file;
+    std::unique_ptr<ConfItem> root;
+    char buf[1024];
 
     static ConfParser* parser;
 };

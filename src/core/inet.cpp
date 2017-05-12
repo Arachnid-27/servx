@@ -12,9 +12,27 @@ void IPSockAddr::set_addr(sockaddr *sa, uint8_t len) {
 }
 
 uint16_t IPSockAddr::get_port() const {
-    auto p = reinterpret_cast<const sockaddr*>(addr);
+    return get_port_from_sockaddr(
+        reinterpret_cast<const sockaddr*>(addr));
+}
 
-    if (p->sa_family == AF_INET6) {
+bool IPSockAddr::is_wildcard() const {
+    auto sa = reinterpret_cast<const sockaddr*>(addr);
+    if (sa->sa_family == AF_INET6) {
+        return
+            *(reinterpret_cast<const uint64_t*>(
+            &(reinterpret_cast<const sockaddr_in6*>(addr)->sin6_addr)))
+            == 0 &&
+            *(reinterpret_cast<const uint64_t*>(
+            &(reinterpret_cast<const sockaddr_in6*>(addr)->sin6_addr)) + 1)
+            == 0;
+    }
+    return *(reinterpret_cast<const uint32_t*>(
+        &reinterpret_cast<const sockaddr_in*>(addr)->sin_addr)) == 0;
+}
+
+uint16_t get_port_from_sockaddr(const sockaddr* addr) {
+    if (addr->sa_family == AF_INET6) {
         return reinterpret_cast<const sockaddr_in6*>(addr)->sin6_port;
     }
 
@@ -23,7 +41,7 @@ uint16_t IPSockAddr::get_port() const {
 
 TcpSocket::TcpSocket()
     : send_buf(-1), recv_buf(-1),
-      backlog(5), fd(-1), reuseport(false) {}
+      backlog(5), fd(-1) {}
 
 TcpSocket::~TcpSocket() {
     if (fd != -1) {
@@ -56,8 +74,7 @@ bool TcpSocket::init_addr(const std::string& s, const std::string& port) {
 bool TcpSocket::is_attr_equal(const std::shared_ptr<TcpSocket>& other) {
     return send_buf == other->send_buf &&
            recv_buf == other->recv_buf &&
-           backlog == other->backlog &&
-           reuseport == other->reuseport;
+           backlog == other->backlog;
 }
 
 int TcpSocket::open_socket() {
@@ -75,14 +92,13 @@ int TcpSocket::open_socket() {
                 return -1;
             }
 
-            if (reuseport &&
-                setsockopt(fd, SOL_SOCKET, SO_REUSEPORT,
+            if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR,
                            &on, sizeof(int)) == -1) {
                 // err_log
                 break;
             }
 
-            if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR,
+            if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT,
                            &on, sizeof(int)) == -1) {
                 // err_log
                 break;

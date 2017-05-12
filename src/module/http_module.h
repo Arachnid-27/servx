@@ -77,9 +77,6 @@ public:
             new Command(ADDRESS_BLOCK,
                         "recv_buf",
                         lambda_handler(recv_buf_handler), 1),
-            new Command(ADDRESS_BLOCK,
-                        "reuseport",
-                        lambda_handler(reuseport_handler), 1),
         }) {}
 
     int http_handler(command_vals_t v);
@@ -101,8 +98,6 @@ public:
     int send_buf_handler(command_vals_t v);
 
     int recv_buf_handler(command_vals_t v);
-
-    int reuseport_handler(command_vals_t v);
 
     bool http_post_handler();
 

@@ -37,6 +37,8 @@ public:
 
     bool is_timeout() const { return timeout; }
 
+    void set_handler(const std::function<void(Event*)> f) { handler = f; }
+
     void expire() {
         timer = 0;
         timeout = 1;

@@ -52,7 +52,11 @@ int MainHttpModule::server_name_handler(command_vals_t v) {
 }
 
 int MainHttpModule::addr_handler(command_vals_t v) {
-    addr = v[0];
+    if (v[0] == "0.0.0.0") {
+        addr = "*";
+    } else {
+        addr = v[0];
+    }
     return NULL_BLOCK;
 }
 
@@ -71,11 +75,6 @@ int MainHttpModule::send_buf_handler(command_vals_t v) {
 
 int MainHttpModule::recv_buf_handler(command_vals_t v) {
     return set_address_value(v, &TcpSocket::set_recv_buf);
-}
-
-int MainHttpModule::reuseport_handler(command_vals_t v) {
-    tcp_socket->set_reuseport(v[0] == "true");
-    return NULL_BLOCK;
 }
 
 bool MainHttpModule::http_post_handler() {

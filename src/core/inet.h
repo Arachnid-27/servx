@@ -31,10 +31,14 @@ public:
 
     uint16_t get_port() const;
 
+    bool is_wildcard() const;
+
 private:
     uint8_t length;
     char addr[sizeof(sockaddr_in6)];
 };
+
+uint16_t get_port_from_sockaddr(const sockaddr* addr);
 
 class TcpSocket {
 public:
@@ -55,10 +59,6 @@ public:
 
     void set_backlog(int s) { backlog = s; }
 
-    bool is_reuseport() const { return reuseport; }
-
-    void set_reuseport(bool r) { reuseport = r; }
-
     int get_send_buf() const { return send_buf; }
 
     void set_send_buf(int s) { send_buf = s; }
@@ -73,6 +73,10 @@ public:
 
     bool is_addr_equal(const std::shared_ptr<TcpSocket>& other);
 
+    bool is_addr_equal(const sockaddr* other);
+
+    bool is_wildcard() const { return addr.is_wildcard(); }
+
     int open_socket();
 
 private:
@@ -84,12 +88,16 @@ private:
     int recv_buf;
     int backlog;
     int fd;
-    bool reuseport;
 };
 
 inline bool TcpSocket::is_addr_equal(
     const std::shared_ptr<TcpSocket>& other) {
-    return memcmp(&addr, &other->addr, sizeof(sockaddr_in)) == 0;
+    return memcmp(addr.get_sockaddr(),
+                  other->addr.get_sockaddr(), addr.get_length()) == 0;
+}
+
+inline bool TcpSocket::is_addr_equal(const sockaddr* other) {
+    return memcmp(addr.get_sockaddr(), other, addr.get_length()) == 0;
 }
 
 }

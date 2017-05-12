@@ -14,16 +14,27 @@ Connection::Connection()
       write_event(new Event(this, true)) {
 }
 
-void Connection::open(int fd, bool lst) {
+bool Connection::open(int fd, bool lst) {
     socket_fd = fd;
     conn_id = ++count;
     listen = lst;
+
+    sockaddr sa;
+    socklen_t len;
+
+    if (getsockname(fd, &sa, &len) == -1) {
+        return false;
+    }
+    local_addr.set_addr(&sa, len);
+
+    return true;
 }
 
 void Connection::close() {
     if (::close(socket_fd) == -1) {
         // err_log
     }
+    socket_fd = -1;
 }
 
 }

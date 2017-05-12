@@ -6,11 +6,24 @@
 
 #include "connection_pool.h"
 #include "event_module.h"
+#include "http_request.h"
 #include "listener.h"
+#include "logger.h"
 #include "module_manager.h"
 #include "timer.h"
 
 namespace servx {
+
+static void init_connection(Connection* conn) {
+    auto lst = Listener::instance()
+        ->find_listening(conn->get_local_sockaddr());
+
+    conn->get_read_event()->set_handler(http_wait_request_handler);
+    conn->get_write_event()->set_ready(true); // enable write event
+    conn->get_write_event()->set_handler(http_empty_handler);
+
+    add_event(conn->get_read_event(), 0);
+}
 
 void accept_event_handler(Event* ev) {
     if (ev->is_timeout()) {
@@ -19,6 +32,7 @@ void accept_event_handler(Event* ev) {
         // so we will disable accept events and set a timer
         // when the timer expire we enable accept events and try again
         if (!Listener::instance()->enable_all()) {
+            Logger::instance()->info("enable all listening fd");
             return;
         }
     }
@@ -40,7 +54,7 @@ void accept_event_handler(Event* ev) {
             err = errno;
 
             if (err == EAGAIN) {
-                // not ready
+                Logger::instance()->info("accept4() not ready");
                 return;
             }
 
@@ -58,6 +72,7 @@ void accept_event_handler(Event* ev) {
 
             if (err == EMFILE || err == ENFILE) {
                 if (Listener::instance()->disable_all()) {
+                    Logger::instance()->info("disable all listening fd");
                     Timer::instance()->add_timer(ev, 500);
                 }
             }
@@ -67,19 +82,15 @@ void accept_event_handler(Event* ev) {
 
         Connection *conn = ConnectionPool::instance()
             ->get_connection(fd, false);
-
         if (conn == nullptr) {
             if (::close(fd) == -1) {
-                // err_log
+                Logger::instance()->warn("close fd %d failed", fd);
                 return;
             }
         }
 
         conn->set_peer_sockaddr(&sa, len);
-        conn->get_write_event()->set_ready(true); // enable write event
-
-        add_event(conn->get_read_event(), 0);
-        // handler listening
+        init_connection(conn);
 
         if (!multi) {
             break;

@@ -10,6 +10,13 @@ class ConfItem {
 public:
     explicit ConfItem(const char* s): name(s) {}
 
+    ConfItem(const ConfItem&) = delete;
+    ConfItem(ConfItem&&) = default;
+    ConfItem& operator=(const ConfItem&) = delete;
+    ConfItem& operator=(ConfItem&&) = delete;
+
+    ~ConfItem() = default;
+
     void push_value(const char* s) { values.emplace_back(s); }
 
     ConfItem* gen_sub_item(const char* s);

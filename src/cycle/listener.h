@@ -27,9 +27,7 @@ public:
 
     bool push_server(const std::shared_ptr<Server>& server, bool def);
 
-    bool is_addr_equal(const std::shared_ptr<TcpSocket>& addr) const;
-
-    bool is_attr_equal(const std::shared_ptr<TcpSocket>& addr) const;
+    const std::shared_ptr<TcpSocket>& get_socket() const { return socket; }
 
     int get_fd() const { return socket->get_fd(); }
 
@@ -38,6 +36,7 @@ public:
     Connection* get_connection() { return conn; }
 
 private:
+    // this is listen connection, not connect connection
     Connection *conn;
     std::shared_ptr<Server> default_server;
     std::vector<std::shared_ptr<Server>> servers;
@@ -58,13 +57,13 @@ public:
 
     bool init_listenings();
 
-    bool init_reuseport_listenings();
-
-    bool set_connection_to_listenings();
+    bool open_listenings();
 
     bool enable_all();
 
     bool disable_all();
+
+    std::shared_ptr<Listening> find_listening(sockaddr* addr);
 
     static Listener* instance() { return listener; }
 
@@ -73,22 +72,11 @@ private:
 
 private:
     std::vector<std::shared_ptr<Listening>> listenings;
-    std::vector<std::shared_ptr<Listening>> reuseport_listenings;
     std::unordered_map<int,
-        std::vector<std::shared_ptr<Listening>>> addresses;
+        std::vector<std::shared_ptr<Listening>>> ports;
 
     static Listener *listener;
 };
-
-inline bool Listening::is_addr_equal(
-    const std::shared_ptr<TcpSocket>& s) const {
-    return socket->is_addr_equal(s);
-}
-
-inline bool Listening::is_attr_equal(
-    const std::shared_ptr<TcpSocket>& s) const {
-    return socket->is_attr_equal(s);
-}
 
 }
 
