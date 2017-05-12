@@ -33,7 +33,7 @@ bool Cycle::reload() {
     }
 
     for (auto& f : open_files) {
-        if (!f.open(OPEN_MODE_RDWR)) {
+        if (!f.open(O_RDWR)) {
             return false;
         }
     }

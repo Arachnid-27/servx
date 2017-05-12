@@ -14,6 +14,7 @@ struct MainCoreConf {
     int rlimit_nofile;
     int worker;
     bool daemon;
+    std::vector<std::string> logs;
 };
 
 class MainCoreModule: public ModuleWithConf<CoreModule,

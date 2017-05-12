@@ -65,7 +65,8 @@ void accept_event_handler(Event* ev) {
             return;
         }
 
-        Connection *conn = ConnectionPool::instance()->get_connection(fd);
+        Connection *conn = ConnectionPool::instance()
+            ->get_connection(fd, false);
 
         if (conn == nullptr) {
             if (::close(fd) == -1) {
@@ -77,7 +78,7 @@ void accept_event_handler(Event* ev) {
         conn->set_peer_sockaddr(&sa, len);
         conn->get_write_event()->set_ready(true); // enable write event
 
-        // Todo add to epoll
+        add_event(conn->get_read_event(), 0);
         // handler listening
 
         if (!multi) {

@@ -21,10 +21,10 @@ void ConnectionPool::init(size_t sz) {
     }
 }
 
-Connection* ConnectionPool::get_connection(int fd) {
+Connection* ConnectionPool::get_connection(int fd, bool lst) {
     auto conn = free_connections.back();
     free_connections.pop_back();
-    conn->open(fd);
+    conn->open(fd, lst);
     return conn;
 }
 

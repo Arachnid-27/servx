@@ -3,6 +3,7 @@
 #include <sys/resource.h>
 
 #include "cycle.h"
+#include "logger.h"
 #include "module_manager.h"
 
 namespace servx {
@@ -51,10 +52,8 @@ int MainCoreModule::daemon_handler(command_vals_t v) {
 }
 
 int MainCoreModule::error_log_handler(command_vals_t v) {
-    auto cycle = Cycle::instance();
-
-    for (auto s : v) {
-        cycle->open_file(s);
+    for (auto &s : v) {
+        Logger::instance()->push_file(s);
     }
 
     return NULL_BLOCK;

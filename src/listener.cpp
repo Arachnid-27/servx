@@ -1,5 +1,8 @@
 #include "listener.h"
 
+#include "connection_pool.h"
+#include "event_module.h"
+
 namespace servx {
 
 bool Listening::push_server(const std::shared_ptr<Server>& server, bool def) {
@@ -46,20 +49,44 @@ bool Listener::push_address(const std::shared_ptr<TcpSocket>& addr,
 }
 
 bool Listener::init_listenings() {
+    Connection *conn;
+
     for (auto &lst : listenings) {
         if (!lst->open_socket()) {
             return false;
         }
+
+        conn = ConnectionPool::instance()
+            ->get_connection(lst->get_fd(), true);
+
+        if (conn == nullptr) {
+            return false;
+        }
+
+        lst->set_connection(conn);
     }
+
     return true;
 }
 
 bool Listener::init_reuseport_listenings() {
+    Connection *conn;
+
     for (auto &lst : reuseport_listenings) {
         if (!lst->open_socket()) {
             return false;
         }
+
+        conn = ConnectionPool::instance()
+            ->get_connection(lst->get_fd(), true);
+
+        if (conn == nullptr) {
+            return false;
+        }
+
+        lst->set_connection(conn);
     }
+
     return true;
 }
 
@@ -72,7 +99,7 @@ bool Listener::enable_all() {
             continue;
         }
 
-        // Todo add to epoll
+        add_event(conn->get_read_event(), 0);
     }
 
     for (auto &lst : reuseport_listenings) {
@@ -81,7 +108,7 @@ bool Listener::enable_all() {
             continue;
         }
 
-        // Todo add to epoll
+        add_event(conn->get_read_event(), 0);
     }
 
     return true;
@@ -96,7 +123,7 @@ bool Listener::disable_all() {
             continue;
         }
 
-        // Todo delete from epoll
+        del_event(conn->get_read_event(), 0);
     }
 
     for (auto &lst : reuseport_listenings) {
@@ -105,7 +132,7 @@ bool Listener::disable_all() {
             continue;
         }
 
-        // Todo delete from epoll
+        del_event(conn->get_read_event(), 0);
     }
 
     return true;

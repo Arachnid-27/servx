@@ -53,6 +53,10 @@ bool EpollModule::add_event(Event* ev, int flags) {
     ee.events = flags;
     ee.data.ptr = c;
 
+    if (!c->is_listen()) {
+        ee.events |= EPOLLET;
+    }
+
     if (epoll_ctl(ep, op, c->get_fd(), &ee) == -1) {
         return false;
     }
@@ -86,6 +90,10 @@ bool EpollModule::del_event(Event* ev, int flags) {
         op = EPOLL_CTL_MOD;
         ee.events = prev | flags;
         ee.data.ptr = c;
+
+        if (!c->is_listen()) {
+            ee.events |= EPOLLET;
+        }
     } else {
         op = EPOLL_CTL_DEL;
         ee.events = 0;
@@ -106,6 +114,10 @@ bool EpollModule::add_connection(Connection* c) {
 
     ee.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP;
     ee.data.ptr = &c;
+
+    if (!c->is_listen()) {
+        ee.events |= EPOLLET;
+    }
 
     if (epoll_ctl(ep, EPOLL_CTL_ADD, c->get_fd(), &ee) == -1) {
         return false;
@@ -196,6 +208,13 @@ bool EpollModule::process_events() {
     }
 
     return true;
+}
+
+int EpollModule::epoll_handler(command_vals_t v) {
+    auto mcf = ModuleManager::instance()->get_conf<MainEventModule>();
+    mcf->module = this;
+
+    return NULL_BLOCK;
 }
 
 int EpollModule::epoll_events_handler(command_vals_t v) {

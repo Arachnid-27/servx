@@ -74,7 +74,7 @@ bool ConfParser::open(const char *pathname) {
         delete conf_file;
     }
     conf_file = new File(pathname);
-    return conf_file->open(OPEN_MODE_RDONLY);
+    return conf_file->open(O_RDONLY);
 }
 
 bool ConfParser::parse(ConfItem *parent) {
@@ -150,13 +150,15 @@ int ConfParser::next_token() {
     len = 0;
 
     while (1) {
-        ch = conf_file->read();
-        switch (ch) {
-        case EOF:
+        // Todo return -1
+        if (conf_file->read(&ch, 1) == 0) {
             if (len != 0) {
                 return STATE_ERROR;
             }
             return STATE_FINISTH;
+        }
+
+        switch (ch) {
         case '\n':
         case '\r':
             if (len != 0) {

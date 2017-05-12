@@ -7,10 +7,6 @@ namespace servx {
 
 void accept_event_handler(Event* ev);
 
-bool enable_accept_event();
-
-bool disable_accept_event();
-
 }
 
 #endif

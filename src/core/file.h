@@ -6,44 +6,46 @@
 
 #include <string>
 
-#define OPEN_MODE_RDONLY O_RDONLY
-#define OPEN_MODE_WDONLY O_WDONLY
-#define OPEN_MODE_RDWR   O_RDWR
-
 namespace servx {
 
 class File {
 public:
-    File(const std::string& s): pathname(s) {}
+    File(int f): fd(f) {}
 
+    File(const std::string& s): pathname(s) {}
     File(const char* s): pathname(s) {}
 
-    ~File() {
-        if (fd != -1) {
-            ::close(fd);
-        }
-    }
+    File(const File&) = delete;
+    File(File&&) = default;
+    File& operator=(const File&) = delete;
+    File& operator=(File&&) = default;
+
+    ~File();
 
     const std::string& get_pathname() const { return pathname; }
 
-    bool open(int mode) {
-        fd = ::open(pathname.c_str(), mode);
-        return fd == -1;
-    }
+    bool open(int flags);
 
-    char read() {
-        char ch;
-        int c = ::read(fd, &ch, 1);
-        return c == 1 ? ch : EOF;
-    }
+    bool open(int flags, mode_t mode);
 
-    int read(char* buf, int count) {
-        return ::read(fd, buf, count);
-    }
+    int read(char* buf, int count) { return ::read(fd, buf, count); }
+
+    int write(char* buf, int count) { return ::write(fd, buf, count); }
+
 private:
     int fd;
     std::string pathname;
 };
+
+inline bool File::open(int flags) {
+    fd = ::open(pathname.c_str(), flags);
+    return fd == -1;
+}
+
+inline bool File::open(int flags, mode_t mode) {
+    fd = ::open(pathname.c_str(), flags, mode);
+    return fd == -1;
+}
 
 bool operator==(const File& lhs, const File& rhs);
 

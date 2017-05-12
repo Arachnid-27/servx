@@ -11,7 +11,7 @@ public:
 
     void update();
 
-    std::time_t get_current_ms() const { return current_ms; }
+    time_t get_current_ms() const { return current_ms; }
 
 public:
     static Clock* instance() { return clock; }
@@ -21,7 +21,7 @@ private:
 
 private:
     std::mutex mtx;
-    std::time_t current_ms;
+    time_t current_ms;
 
 private:
     static Clock* clock;

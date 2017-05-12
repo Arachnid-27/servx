@@ -10,14 +10,15 @@ namespace servx {
 class ConnectionPool {
 public:
     ConnectionPool(const ConnectionPool&) = delete;
-
+    ConnectionPool(ConnectionPool&&) = delete;
     ConnectionPool& operator=(const ConnectionPool&) = delete;
+    ConnectionPool& operator=(ConnectionPool&&) = delete;
 
     ~ConnectionPool();
 
     void init(size_t sz);
 
-    Connection* get_connection(int fd);
+    Connection* get_connection(int fd, bool lst);
 
     void ret_connection(Connection* conn);
 

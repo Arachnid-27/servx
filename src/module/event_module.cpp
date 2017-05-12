@@ -3,7 +3,6 @@
 #include <sys/resource.h>
 
 #include "connection_pool.h"
-#include "module_manager.h"
 #include "signals.h"
 
 namespace servx {
@@ -12,6 +11,7 @@ bool MainEventModule::init_conf() {
     conf.time_resolution = 100;
     conf.connections = 1024;
     conf.multi_accept = false;
+    conf.module = nullptr;
     return true;
 }
 

@@ -21,7 +21,7 @@ public:
 
     ~Connection() = default;
 
-    void open(int fd);
+    void open(int fd, bool lst = false);
 
     void close();
 
@@ -35,11 +35,19 @@ public:
 
     Event* get_write_event() { return write_event; }
 
+    uint64_t get_conn_id() const { return conn_id; }
+
+    bool is_listen() const { return listen; }
+
 private:
+    uint64_t conn_id;
     int socket_fd;
     IPSockAddr peer_addr;
     Event *read_event;
     Event *write_event;
+    bool listen;
+
+    static uint64_t count;
 };
 
 inline void Connection::set_peer_sockaddr(sockaddr* sa, socklen_t len) {

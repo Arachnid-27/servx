@@ -4,6 +4,7 @@
 #include "connection.h"
 #include "core_module.h"
 #include "event.h"
+#include "module_manager.h"
 
 namespace servx {
 
@@ -28,6 +29,7 @@ struct MainEventConf {
     int time_resolution;
     int connections;
     bool multi_accept;
+    EventModule *module;
 };
 
 class MainEventModule: public ModuleWithConf<CoreModule,
@@ -66,6 +68,25 @@ public:
 
     static void sig_timer_handler(int sig);
 };
+
+inline bool add_event(Event* ev, int flags) {
+    return ModuleManager::instance()->get_conf<MainEventModule>()
+        ->module->add_event(ev, flags);
+}
+
+inline bool del_event(Event* ev, int flags) {
+    return ModuleManager::instance()->get_conf<MainEventModule>()
+        ->module->del_event(ev, flags);
+}
+
+inline bool add_connection(Connection* c) {
+    return ModuleManager::instance()->get_conf<MainEventModule>()
+        ->module->add_connection(c);
+}
+inline bool del_connection(Connection* c) {
+    return ModuleManager::instance()->get_conf<MainEventModule>()
+        ->module->del_connection(c);
+}
 
 }
 

@@ -47,7 +47,7 @@ public:
     void handle() { handler(this); }
 
 private:
-    Connection* conn;
+    Connection *conn;
     uint32_t write:1;
     uint32_t active:1;
     uint32_t ready:1;

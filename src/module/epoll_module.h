@@ -11,12 +11,20 @@ struct EpollModuleConf {
     int epoll_events;
 };
 
+struct ConnectionPacked {
+    uint64_t conn_id;
+    Connection *conn;
+};
+
 class EpollModule: public ModuleWithConf<EventModule,
                           EpollModuleConf,
                           EPOLL_MODULE> {
 public:
     EpollModule(): ModuleWithConf(
         {
+            new Command(EVENT_BLOCK,
+                        "use_epoll",
+                        lambda_handler(epoll_handler), 0),
             new Command(EVENT_BLOCK,
                         "epoll_events",
                         lambda_handler(epoll_events_handler), 1)
@@ -37,6 +45,8 @@ public:
     bool process_events() override;
 
     int epoll_events_handler(command_vals_t);
+
+    int epoll_handler(command_vals_t);
 
 private:
     int ep;
