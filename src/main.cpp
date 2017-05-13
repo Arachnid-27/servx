@@ -68,6 +68,8 @@ bool init() {
     Logger::instance()->debug("parse configure success!");
     Logger::instance()->open_files();
 
+    Listener::instance()->init_listenings();
+
     if (!manager->for_each([](Module* m) { return m->init_module(); })) {
         Logger::instance()->error("init module error!");
         return false;

@@ -2,62 +2,52 @@
 
 #include <algorithm>
 
+#include "accept.h"
 #include "connection_pool.h"
 #include "event_module.h"
 #include "logger.h"
 
 namespace servx {
 
-bool Listening::push_server(const std::shared_ptr<Server>& server, bool def) {
-    if (def) {
-        if (default_server != nullptr) {
-            return false;
-        }
-        default_server = server;
-    }
-    servers.push_back(server);
-    return true;
-}
-
 Listener* Listener::listener = new Listener;
-bool Listener::push_address(const std::shared_ptr<TcpSocket>& socket,
-                            const std::shared_ptr<Server>& server, bool def) {
+
+Listening* Listener::push_address(const std::shared_ptr<TcpSocket>& socket) {
     auto &vec = ports[socket->get_port()];
 
     for (auto &lst : vec) {
         if (socket->is_addr_equal(lst->get_socket())) {
             if (!socket->is_attr_equal(lst->get_socket())) {
                 // ambiguous if addr:port is same but attr is different
-                return false;
+                return nullptr;
             }
 
-            lst->push_server(server, def);
-
-            return true;
+            return lst.get();
         }
     }
 
-    auto lst = std::make_shared<Listening>(socket);
-    lst->push_server(server, def);
-    vec.push_back(lst);
-    listenings.push_back(lst);
+    vec.emplace_back(new Listening(socket));
+    listenings.push_back(vec.back().get());
 
-    return true;
+    return vec.back().get();
 }
 
 bool Listener::init_listenings() {
-    // Todo delete same port and have wildcard address
-    // we should make sure the wildcard address be bound in the end
-    auto comp = [](const std::shared_ptr<Listening>& lhs,
-                   const std::shared_ptr<Listening>& rhs)
+    // we must make sure the wildcard address be bound in the end
+    // we don't care the order of other addresses
+
+    auto comp1 = [](const std::unique_ptr<Listening>& lhs,
+                   const std::unique_ptr<Listening>& rhs)
         { return rhs->get_socket()->is_wildcard(); };
 
     for (auto &pr : ports) {
-        std::sort(pr.second.begin(), pr.second.end(), comp);
+        std::sort(pr.second.begin(), pr.second.end(), comp1);
         pr.second.shrink_to_fit();
     }
 
-    std::sort(listenings.begin(), listenings.end(), comp);
+    auto comp2 = [](const Listening* lhs, const Listening* rhs)
+        { return rhs->get_socket()->is_wildcard(); };
+
+    std::sort(listenings.begin(), listenings.end(), comp2);
 
     auto iter = listenings.cbegin();
     while (iter != listenings.cend()) {
@@ -66,7 +56,11 @@ bool Listener::init_listenings() {
             break;
         }
 
-        auto vec = ports[(*iter)->get_socket()->get_port()];
+        // delete the socket which have same attr and
+        // port with the wildcard address
+        // we only bind the wildcard address
+        // we can find the real server by searching 'ports'
+        auto &vec = ports[(*iter)->get_socket()->get_port()];
         auto socket2 = vec.back()->get_socket();
         if (socket2->is_wildcard() && socket1->is_attr_equal(socket2)) {
             iter = listenings.erase(iter);
@@ -76,6 +70,7 @@ bool Listener::init_listenings() {
     }
 
     listenings.shrink_to_fit();
+    Logger::instance()->debug("%d listenings in total", listenings.size());
 
     return true;
 }
@@ -83,9 +78,10 @@ bool Listener::init_listenings() {
 bool Listener::open_listenings() {
     Connection *conn;
 
-    for (auto &lst : listenings) {
-        if (!lst->open_socket()) {
-            Logger::instance()->error("open socket failed");
+    for (auto lst : listenings) {
+        int fd = lst->open_socket();
+        if (fd == -1) {
+            Logger::instance()->error("open socket failed, errno %d", errno);
             return false;
         }
 
@@ -94,6 +90,9 @@ bool Listener::open_listenings() {
         if (conn == nullptr) {
             return false;
         }
+
+        conn->get_read_event()->set_handler(
+            [&](Event* ev) { accept_event_handler(lst, ev); });
         lst->set_connection(conn);
     }
 
@@ -103,7 +102,7 @@ bool Listener::open_listenings() {
 bool Listener::enable_all() {
     Connection *conn;
 
-    for (auto &lst : listenings) {
+    for (auto lst : listenings) {
         conn = lst->get_connection();
         if (conn == nullptr || conn->get_read_event()->is_active()) {
             continue;
@@ -118,7 +117,7 @@ bool Listener::enable_all() {
 bool Listener::disable_all() {
     Connection *conn;
 
-    for (auto &lst : listenings) {
+    for (auto lst : listenings) {
         conn = lst->get_connection();
         if (conn == nullptr || !conn->get_read_event()->is_active()) {
             continue;
@@ -130,7 +129,7 @@ bool Listener::disable_all() {
     return true;
 }
 
-std::shared_ptr<Listening> Listener::find_listening(sockaddr* addr) {
+Listening* Listener::find_listening(sockaddr* addr) {
     auto iter = ports.find(get_port_from_sockaddr(addr));
     if (iter == ports.end()) {
         return nullptr;
@@ -138,8 +137,13 @@ std::shared_ptr<Listening> Listener::find_listening(sockaddr* addr) {
 
     for (auto &lst : iter->second) {
         if (lst->get_socket()->is_addr_equal(addr)) {
-            return lst;
+            return lst.get();
         }
+    }
+
+    // use the wildcard address
+    if ((iter->second).back()->get_socket()->is_wildcard()) {
+        return (iter->second).back().get();
     }
 
     return nullptr;

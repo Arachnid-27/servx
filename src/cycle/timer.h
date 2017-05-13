@@ -4,7 +4,7 @@
 #include <ctime>
 #include <set>
 
-#include "event.h"
+#include "connection.h"
 
 namespace servx {
 

@@ -3,6 +3,7 @@
 
 #include <vector>
 
+#include "listener.h"
 #include "location.h"
 
 namespace servx {
@@ -18,7 +19,7 @@ public:
 
     ~Server() = default;
 
-    void push_server_name(const std::string& s) { server_names.push_back(std::move(s)); }
+    void push_server_name(const std::string& s) { server_names.push_back(s); }
 
     bool push_location(const std::string& uri, bool regex);
 
@@ -31,6 +32,26 @@ private:
     std::vector<std::shared_ptr<Location>> regex_locations;
     LocationTree prefix_locations;
     std::unique_ptr<ModuleConf> confs[NULL_MODULE];
+};
+
+class HttpServers: public ListeningServers {
+public:
+    HttpServers() = default;
+
+    HttpServers(const Server&) = delete;
+    HttpServers(Server&&) = delete;
+    HttpServers& operator=(const Server&) = delete;
+    HttpServers& operator=(Server&&) = delete;
+
+    ~HttpServers() = default;
+
+    bool push_server(Server* srv, bool def);
+
+    Server* get_default_server() { return default_server; }
+
+private:
+    Server* default_server;
+    std::vector<Server*> servers;
 };
 
 }

@@ -1,24 +1,26 @@
 #ifndef _HTTP_REQUEST_H_
 #define _HTTP_REQUEST_H_
 
-#include "listener.h"
+#include "server.h"
 
 namespace servx {
 
 class HttpRequest {
 };
 
-class HttpConnection {
+class HttpConnection: public ConnectionContext {
 public:
-    void set_listening(std::shared_ptr<Listening> listening);
+    void set_server(Server* srv) { server = srv; }
 
 private:
-    std::shared_ptr<Listening> listening;
+    Server *server;
 };
 
 void http_wait_request_handler(Event* ev);
 
 void http_empty_handler(Event* ev);
+
+void http_init_connection(Connection* conn);
 
 }
 

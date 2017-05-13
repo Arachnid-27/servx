@@ -59,23 +59,20 @@ public:
 
     void set_backlog(int s) { backlog = s; }
 
-    int get_send_buf() const { return send_buf; }
-
     void set_send_buf(int s) { send_buf = s; }
-
-    int get_recv_buf() const { return recv_buf; }
 
     void set_recv_buf(int s) { recv_buf = s; }
 
-    bool init_addr(const std::string& s, const std::string& port);
+    bool is_deferred_accept() const { return deferred_accept; }
+    void set_deferred_accept(bool d) { deferred_accept = d; }
 
     bool is_attr_equal(const std::shared_ptr<TcpSocket>& other);
-
     bool is_addr_equal(const std::shared_ptr<TcpSocket>& other);
-
     bool is_addr_equal(const sockaddr* other);
 
     bool is_wildcard() const { return addr.is_wildcard(); }
+
+    bool init_addr(const std::string& s, const std::string& port);
 
     int open_socket();
 
@@ -88,6 +85,7 @@ private:
     int recv_buf;
     int backlog;
     int fd;
+    bool deferred_accept;
 };
 
 inline bool TcpSocket::is_addr_equal(

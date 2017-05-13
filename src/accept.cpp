@@ -6,7 +6,6 @@
 
 #include "connection_pool.h"
 #include "event_module.h"
-#include "http_request.h"
 #include "listener.h"
 #include "logger.h"
 #include "module_manager.h"
@@ -14,18 +13,7 @@
 
 namespace servx {
 
-static void init_connection(Connection* conn) {
-    auto lst = Listener::instance()
-        ->find_listening(conn->get_local_sockaddr());
-
-    conn->get_read_event()->set_handler(http_wait_request_handler);
-    conn->get_write_event()->set_ready(true); // enable write event
-    conn->get_write_event()->set_handler(http_empty_handler);
-
-    add_event(conn->get_read_event(), 0);
-}
-
-void accept_event_handler(Event* ev) {
+void accept_event_handler(Listening* lst, Event* ev) {
     if (ev->is_timeout()) {
         // if we get ENFILE or EMFILE
         // it means we can't accept until we release some fds
@@ -80,17 +68,21 @@ void accept_event_handler(Event* ev) {
             return;
         }
 
-        Connection *conn = ConnectionPool::instance()
-            ->get_connection(fd, false);
+        Connection *conn = ConnectionPool::instance()->get_connection(fd);
         if (conn == nullptr) {
             if (::close(fd) == -1) {
                 Logger::instance()->warn("close fd %d failed", fd);
                 return;
             }
         }
-
         conn->set_peer_sockaddr(&sa, len);
-        init_connection(conn);
+
+        conn->get_write_event()->set_ready(true); // enable write event
+        if (lst->get_socket()->is_deferred_accept()) {
+            conn->get_read_event()->set_ready(true);
+        }
+
+        lst->handle(conn);
 
         if (!multi) {
             break;

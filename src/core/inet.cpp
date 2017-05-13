@@ -2,6 +2,7 @@
 
 #include <errno.h>
 #include <netdb.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
 
 namespace servx {
@@ -57,6 +58,8 @@ bool TcpSocket::init_addr(const std::string& s, const std::string& port) {
     hint.ai_family = AF_UNSPEC;
     hint.ai_socktype = SOCK_STREAM;
     hint.ai_flags = AI_ADDRCONFIG | AI_NUMERICHOST | AI_NUMERICSERV;
+
+    // Todo * return ipv6
 
     if (getaddrinfo(s.c_str(), port.c_str(), &hint, &res) == -1) {
         // err_log
@@ -127,6 +130,13 @@ int TcpSocket::open_socket() {
             setsockopt(fd, SOL_SOCKET, SO_SNDBUF,
                        &send_buf, sizeof(int)) == -1) {
             // err_log
+        }
+
+        if (deferred_accept &&
+            setsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT,
+                      &on, sizeof(int)) == 1) {
+            // err_log
+            deferred_accept = false;
         }
 
         return fd;

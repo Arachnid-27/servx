@@ -7,9 +7,10 @@
 
 #include "connection.h"
 #include "inet.h"
-#include "server.h"
 
 namespace servx {
+
+struct ListeningServers {};
 
 class Listening {
 public:
@@ -23,9 +24,12 @@ public:
 
     ~Listening() = default;
 
-    bool open_socket() { return socket->open_socket() != -1; }
+    int open_socket() { return socket->open_socket(); }
 
-    bool push_server(const std::shared_ptr<Server>& server, bool def);
+    template <class T>
+    void set_servers(T* p) { servers = std::move(std::unique_ptr<T>(p)); }
+
+    ListeningServers* get_servers() { return servers.get(); }
 
     const std::shared_ptr<TcpSocket>& get_socket() const { return socket; }
 
@@ -35,11 +39,15 @@ public:
 
     Connection* get_connection() { return conn; }
 
+    void set_handler(const std::function<void(Connection*)> h) { handler = h; }
+
+    void handle(Connection* c) { handler(c); }
+
 private:
     // this is listen connection, not connect connection
     Connection *conn;
-    std::shared_ptr<Server> default_server;
-    std::vector<std::shared_ptr<Server>> servers;
+    std::function<void(Connection*)> handler;
+    std::unique_ptr<ListeningServers> servers;
     std::shared_ptr<TcpSocket> socket;
 };
 
@@ -52,8 +60,7 @@ public:
 
     ~Listener() = default;
 
-    bool push_address(const std::shared_ptr<TcpSocket>& addr,
-                      const std::shared_ptr<Server>& server, bool def);
+    Listening* push_address(const std::shared_ptr<TcpSocket>& addr);
 
     bool init_listenings();
 
@@ -63,7 +70,7 @@ public:
 
     bool disable_all();
 
-    std::shared_ptr<Listening> find_listening(sockaddr* addr);
+    Listening* find_listening(sockaddr* addr);
 
     static Listener* instance() { return listener; }
 
@@ -71,9 +78,9 @@ private:
     Listener() = default;
 
 private:
-    std::vector<std::shared_ptr<Listening>> listenings;
+    std::vector<Listening*> listenings;
     std::unordered_map<int,
-        std::vector<std::shared_ptr<Listening>>> ports;
+        std::vector<std::unique_ptr<Listening>>> ports;
 
     static Listener *listener;
 };

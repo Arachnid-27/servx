@@ -29,4 +29,17 @@ std::shared_ptr<Location> Server::serach(const std::string& uri) {
     return prefix_locations.search(uri);
 }
 
+
+bool HttpServers::push_server(Server* srv, bool def) {
+    if (def) {
+        if (default_server != nullptr) {
+            return false;
+        }
+        default_server = srv;
+    }
+    servers.push_back(srv);
+
+    return true;
+}
+
 }

@@ -35,7 +35,7 @@ protected:
 };
 
 struct MainHttpConf {
-    std::vector<std::shared_ptr<Server>> servers;
+    std::vector<std::unique_ptr<Server>> servers;
 };
 
 class MainHttpModule: public ModuleWithConf<HttpModule,
@@ -111,6 +111,7 @@ private:
     int set_address_value(command_vals_t v, tcp_socket_setter setter);
 
 private:
+    // temp variables
     std::shared_ptr<TcpSocket> tcp_socket;
     std::string addr;
     std::string port;

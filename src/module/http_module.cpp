@@ -1,5 +1,6 @@
 #include "http_module.h"
 
+#include "http_request.h"
 #include "module_manager.h"
 #include "listener.h"
 
@@ -52,11 +53,7 @@ int MainHttpModule::server_name_handler(command_vals_t v) {
 }
 
 int MainHttpModule::addr_handler(command_vals_t v) {
-    if (v[0] == "0.0.0.0") {
-        addr = "*";
-    } else {
-        addr = v[0];
-    }
+    addr = v[0];
     return NULL_BLOCK;
 }
 
@@ -90,9 +87,21 @@ bool MainHttpModule::address_post_handler() {
     if (!tcp_socket->init_addr(addr, port)) {
         return false;
     }
-    Listener::instance()->push_address(
-        tcp_socket, conf.servers.back(), default_server);
-    return true;
+
+    auto lst = Listener::instance()->push_address(
+        tcp_socket);
+    if (lst == nullptr) {
+        return false;
+    }
+
+    HttpServers *hs = static_cast<HttpServers*>(lst->get_servers());
+    if (hs == nullptr) {
+        hs = new HttpServers;
+        lst->set_servers(hs);
+        lst->set_handler(http_init_connection);
+    }
+
+    return hs->push_server(conf.servers.back().get(), default_server);
 }
 
 inline int MainHttpModule::set_address_value(command_vals_t v,

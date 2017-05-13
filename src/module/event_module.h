@@ -3,7 +3,6 @@
 
 #include "connection.h"
 #include "core_module.h"
-#include "event.h"
 #include "module_manager.h"
 
 namespace servx {

@@ -3,6 +3,7 @@
 #include <cstdlib>
 
 #include "clock.h"
+#include "listener.h"
 #include "module_manager.h"
 
 namespace servx {
@@ -16,6 +17,8 @@ void worker_process_cycle() {
         // error_log
         exit(EXIT_FAILURE);
     }
+
+    Listener::instance()->open_listenings();
 
     while (1) {
     }

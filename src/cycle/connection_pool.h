@@ -18,7 +18,7 @@ public:
 
     void init(size_t sz);
 
-    Connection* get_connection(int fd, bool lst);
+    Connection* get_connection(int fd, bool lst = false);
 
     void ret_connection(Connection* conn);
 
