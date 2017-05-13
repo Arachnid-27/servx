@@ -3,6 +3,7 @@
 
 #include <sys/socket.h>
 
+#include "buffer.h"
 #include "inet.h"
 
 namespace servx {
@@ -34,6 +35,12 @@ public:
     bool is_ready() const { return ready; }
     void set_ready(bool r) { ready = r; }
 
+    bool is_eof() const { return eof; }
+    void set_eof(bool e) { eof = e; }
+
+    bool is_error() const { return error; }
+    void set_error(bool e) { error = e; }
+
     bool is_timeout() const { return timeout; }
 
     void handle() { handler(this); }
@@ -49,6 +56,8 @@ private:
     uint32_t active:1;
     uint32_t ready:1;
     uint32_t timeout:1;
+    uint32_t eof:1;
+    uint32_t error:1;
     time_t timer;
     std::function<void(Event*)> handler;
 };
@@ -87,9 +96,16 @@ public:
     bool is_listen() const { return listen; }
 
     template <class T>
-    void set_context(T* c) { ctx = std::move(std::unique_ptr<T>(c)); }
+    void set_context(T* c) { ctx = std::unique_ptr<T>(c); }
+    ConnectionContext* get_context() const { return ctx.get(); }
 
-    ConnectionContext* get_context() { return ctx.get(); }
+    void init_recv_buf(int sz);
+
+    Buffer* get_recv_buf() const { return recv_buf.get(); }
+    Buffer* relase_recv_buf() { return recv_buf.release(); }
+
+    bool is_timeout() const { return timeout; }
+    void set_timeout(bool t) { timeout = t; }
 
 private:
     uint64_t conn_id;
@@ -99,7 +115,9 @@ private:
     Event read_event;
     Event write_event;
     std::unique_ptr<ConnectionContext> ctx;
-    bool listen;
+    std::unique_ptr<Buffer> recv_buf;
+    uint32_t listen:1;
+    uint32_t timeout:1;
 
     static uint64_t count;
 };

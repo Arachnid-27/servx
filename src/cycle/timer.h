@@ -18,6 +18,11 @@ public:
 class Timer {
 public:
     Timer(const Timer&) = delete;
+    Timer(Timer&&) = delete;
+    Timer& operator=(const Timer&) = delete;
+    Timer& operator=(Timer&&) = delete;
+
+    ~Timer() = default;
 
     void add_timer(Event* ev, std::time_t delay);
 

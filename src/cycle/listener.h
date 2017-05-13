@@ -27,7 +27,7 @@ public:
     int open_socket() { return socket->open_socket(); }
 
     template <class T>
-    void set_servers(T* p) { servers = std::move(std::unique_ptr<T>(p)); }
+    void set_servers(T* p) { servers = std::unique_ptr<T>(p); }
 
     ListeningServers* get_servers() { return servers.get(); }
 

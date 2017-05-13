@@ -23,6 +23,7 @@ void Event::reset() {
     ready = 0;
     timeout = 0;
     timer = 0;
+    eof = 0;
 }
 
 uint64_t Connection::count = 0;
@@ -54,5 +55,13 @@ void Connection::close() {
     }
     socket_fd = -1;
 }
+
+void Connection::init_recv_buf(int sz) {
+    if (sz <= recv_buf->get_size()) {
+        recv_buf->reset();
+    } else {
+        recv_buf = std::unique_ptr<Buffer>(new Buffer(sz));
+    }
+};
 
 }

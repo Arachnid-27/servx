@@ -36,7 +36,7 @@ bool Listener::init_listenings() {
     // we don't care the order of other addresses
 
     auto comp1 = [](const std::unique_ptr<Listening>& lhs,
-                   const std::unique_ptr<Listening>& rhs)
+                    const std::unique_ptr<Listening>& rhs)
         { return rhs->get_socket()->is_wildcard(); };
 
     for (auto &pr : ports) {
