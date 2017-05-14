@@ -1,6 +1,7 @@
 #include "http_request.h"
 
 #include "event_module.h"
+#include "http_parse.h"
 #include "io.h"
 #include "logger.h"
 #include "timer.h"
@@ -8,7 +9,8 @@
 namespace servx {
 
 HttpRequest::HttpRequest(Buffer* buf)
-    : method(METHOD_UNKONWN), parse_state(0), recv_buf(buf) {
+    : http_method(METHOD_UNKONWN), parse_state(0),
+      last_parse(0), recv_buf(buf) {
 }
 
 void close_http_connection(Connection* conn);
@@ -69,8 +71,16 @@ void http_wait_request_handler(Event* ev) {
     ev->handle();
 }
 
-static inline HttpConnection* get_http_connection(Connection* conn) {
+inline HttpConnection* get_http_connection(Connection* conn) {
     return static_cast<HttpConnection*>(conn->get_context());
+}
+
+void http_read_request_header(Event* ev, HttpRequest* req) {
+    Buffer *buf = req->get_recv_buf();
+    int n;
+
+    if (ev->is_ready()) {
+    }
 }
 
 void http_process_request_line(Event* ev) {
@@ -82,6 +92,14 @@ void http_process_request_line(Event* ev) {
         conn->set_timeout(true);
         req->close(HTTP_REQUEST_TIME_OUT);
         return;
+    }
+
+    int rc = PARSE_AGAIN;
+
+    while (true) {
+        if (rc == PARSE_AGAIN) {
+            // Todo read
+        }
     }
 }
 

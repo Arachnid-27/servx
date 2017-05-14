@@ -61,7 +61,7 @@ public:
 
     ~HttpRequest() = default;
 
-    HttpMethod get_method() const { return http_method; }
+    HttpMethod get_http_method() const { return http_method; }
     void set_method(HttpMethod hm) { http_method = hm; }
 
     void set_method(const char* p1, const char* p2) { set_req_attr(method); }
@@ -69,6 +69,16 @@ public:
     void set_host(const char* p1, const char* p2) { set_req_attr(host); }
     void set_port(const char* p1, const char* p2) { set_req_attr(port); }
     void set_uri(const char* p1, const char* p2) { set_req_attr(uri); }
+    void set_args(const char* p1, const char* p2) { set_req_attr(args); }
+    void set_version(const char* p1, const char* p2) { set_req_attr(version); }
+
+    const std::string& get_method() const { return method; }
+    const std::string& get_schema() const { return schema; }
+    const std::string& get_host() const { return host; }
+    const std::string& get_port() const { return port; }
+    const std::string& get_uri() const { return uri; }
+    const std::string& get_args() const { return args; }
+    const std::string& get_version() const { return version; }
 
     void handle_read() { read_handler(this); }
     void set_read_handler(const http_req_handler_t& h) { read_handler = h; }
@@ -81,11 +91,15 @@ public:
 
     Buffer* get_recv_buf() const { return recv_buf.get(); }
 
+    int get_last_parse() const { return last_parse; }
+    void set_last_parse(int n) { last_parse = n; }
+
     void close(int state) {}
 
 private:
     HttpMethod http_method;
     int parse_state;
+    int last_parse;
     // void** ctx;
     http_req_handler_t read_handler;
     http_req_handler_t write_handler;
@@ -98,6 +112,8 @@ private:
     std::string host;
     std::string port;
     std::string uri;
+    std::string args;
+    std::string version;
 };
 
 class HttpConnection: public ConnectionContext {

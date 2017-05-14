@@ -21,8 +21,11 @@ public:
     void set_last(char* p) { last = p; }
 
     int get_size() const { return size; }
+    int get_remain() const { return end - last; }
 
     void reset();
+    void shrink();
+    void resize(int sz);
 
 private:
     int size;
