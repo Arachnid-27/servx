@@ -5,6 +5,9 @@
 
 #include "server.h"
 
+#define set_req_attr(attr)           \
+    attr = std::string(p1, p2);
+
 namespace servx {
 
 enum HttpMethod {
@@ -13,7 +16,8 @@ enum HttpMethod {
     METHOD_HEAD,
     METHOD_POST,
     METHOD_PUT,
-    METHOD_DELETE
+    METHOD_DELETE,
+    METHOD_OPTIONS
 };
 
 enum HttpStateCode {
@@ -57,8 +61,14 @@ public:
 
     ~HttpRequest() = default;
 
-    HttpMethod get_method() const { return method; }
-    void set_method(HttpMethod hm) { method = hm; }
+    HttpMethod get_method() const { return http_method; }
+    void set_method(HttpMethod hm) { http_method = hm; }
+
+    void set_method(const char* p1, const char* p2) { set_req_attr(method); }
+    void set_schema(const char* p1, const char* p2) { set_req_attr(schema); }
+    void set_host(const char* p1, const char* p2) { set_req_attr(host); }
+    void set_port(const char* p1, const char* p2) { set_req_attr(port); }
+    void set_uri(const char* p1, const char* p2) { set_req_attr(uri); }
 
     void handle_read() { read_handler(this); }
     void set_read_handler(const http_req_handler_t& h) { read_handler = h; }
@@ -74,7 +84,7 @@ public:
     void close(int state) {}
 
 private:
-    HttpMethod method;
+    HttpMethod http_method;
     int parse_state;
     // void** ctx;
     http_req_handler_t read_handler;
@@ -82,6 +92,12 @@ private:
     std::unique_ptr<Buffer> recv_buf;
     std::unordered_map<std::string, std::string> headers_in;
     std::unordered_map<std::string, std::string> headers_out;
+
+    std::string method;
+    std::string schema;
+    std::string host;
+    std::string port;
+    std::string uri;
 };
 
 class HttpConnection: public ConnectionContext {

@@ -8,14 +8,9 @@ namespace servx {
 enum HttpParseResult {
     PARSE_OK,
     PARSE_AGAIN,
+    PARSE_INVALID_METHOD,
+    PARSE_INVALID_REQUEST,
     PARSE_ERROR
-};
-
-enum HttpParseState {
-    PARSE_START,
-    PARSE_METHOD,
-    PARSE_SPACE,
-    PARSE_SCHEMA
 };
 
 int http_parse_request_line(HttpRequest* req);
