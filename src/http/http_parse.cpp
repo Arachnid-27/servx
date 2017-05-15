@@ -29,6 +29,7 @@ inline int compare_method_8(const char* p1, const char* p2) {
 
 enum HttpParseState {
     PARSE_START,
+
     PARSE_METHOD,
     PARSE_BEFORE_URI,
     PARSE_ABSOLUTE_URI_SCHEMA,
@@ -51,8 +52,16 @@ enum HttpParseState {
     PARSE_VERSION_HTTP_SLASH,
     PARSE_VERSION_HTTP_SLASH_NUMBER,
     PARSE_VERSION_HTTP_SLASH_VERSION,
+
+    PARSE_HEADERS_NAME,
+    PARSE_HEADERS_COLON,
+    PARSE_HEADERS_VALUE,
+
     PARSE_LAST_CR,
     PARSE_LAST_CR_LF,
+    PARSE_LAST_CR_LF_CR,
+    PARSE_LAST_CR_LF_CR_LF,
+
     PARSE_DONE
 };
 
@@ -84,14 +93,12 @@ void http_parse_method(HttpRequest* req, const char* p1, const char *p2) {
     case 6:
         if (compare_method_6(p1, "DELETE")) {
             req->set_method(METHOD_DELETE);
-            break;
         }
 
         break;
     case 7:
         if (compare_method_8(p1, "OPTIONS ")) {
             req->set_method(METHOD_OPTIONS);
-            break;
         }
 
         break;
@@ -106,7 +113,7 @@ int http_parse_request_line(HttpRequest* req) {
     char *last = buf->get_last();
     char c, ch;
 
-    for (char *p = buf->get_pos() + req->get_last_parse(); p < last; ++p) {
+    for (char *p = buf->get_pos() + req->get_buf_offset(); p < last; ++p) {
         ch = *p;
 
         switch (state) {
@@ -116,12 +123,11 @@ int http_parse_request_line(HttpRequest* req) {
             }
 
             if (ch >= 'A' && ch <= 'Z') {
-                buf->set_pos(p);
                 state = PARSE_METHOD;
                 break;
             }
 
-            return PARSE_INVALID_METHOD;
+            return PARSE_ERROR;
 
         case PARSE_METHOD:
             if (ch >= 'A' && ch <= 'Z') {
@@ -129,13 +135,13 @@ int http_parse_request_line(HttpRequest* req) {
             }
 
             if (ch == ' ') {
-                // Todo parse method
+                http_parse_method(req, buf->get_pos(), p);
                 req->set_method(buf->get_pos(), p);
                 state = PARSE_BEFORE_URI;
                 break;
             }
 
-            return PARSE_INVALID_METHOD;
+            return PARSE_ERROR;
 
         case PARSE_BEFORE_URI:
             if (ch == '/') {
@@ -155,7 +161,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_INVALID_REQUEST;
+            return PARSE_ERROR;
 
         case PARSE_ABSOLUTE_URI_SCHEMA:
             c = LOWER_CASE(ch);
@@ -169,7 +175,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_INVALID_REQUEST;
+            return PARSE_ERROR;
 
         case PARSE_ABSOLUTE_URI_SCHEMA_SLASH:
             if (ch == '/') {
@@ -177,7 +183,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_INVALID_REQUEST;
+            return PARSE_ERROR;
 
         case PARSE_ABSOLUTE_URI_SCHEMA_SLASH_2:
             if (ch == '/') {
@@ -185,7 +191,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_INVALID_REQUEST;
+            return PARSE_ERROR;
 
         case PARSE_ABSOLUTE_URI_HOST:   // rfc 3986 3.2.2
             buf->set_pos(p);
@@ -228,7 +234,7 @@ int http_parse_request_line(HttpRequest* req) {
                 state = PARSE_VERSION_H;
                 break;
             default:
-                return PARSE_INVALID_REQUEST;
+                return PARSE_ERROR;
             }
 
             break;
@@ -248,7 +254,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_INVALID_REQUEST;
+            return PARSE_ERROR;
 
         case PARSE_ABSOLUTE_URI_HOST_COLON:
             if (ch >= '0' && ch <= '9') {
@@ -267,7 +273,7 @@ int http_parse_request_line(HttpRequest* req) {
                 state = PARSE_VERSION_H;
                 break;
             default:
-                return PARSE_INVALID_REQUEST;
+                return PARSE_ERROR;
             }
 
             break;
@@ -289,7 +295,7 @@ int http_parse_request_line(HttpRequest* req) {
                 state = PARSE_VERSION_H;
                 break;
             default:
-                return PARSE_INVALID_REQUEST;
+                return PARSE_ERROR;
             }
 
             break;
@@ -309,9 +315,12 @@ int http_parse_request_line(HttpRequest* req) {
                 buf->set_pos(p);
                 state = PARSE_ABS_PATH_QUESTION;
                 break;
+            case '%':
+                req->set_quoted(true);
+                break;
             case CR:
             case LF:
-                return PARSE_INVALID_REQUEST;
+                return PARSE_ERROR;
             }
 
             break;
@@ -326,7 +335,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             case CR:
             case LF:
-                return PARSE_INVALID_REQUEST;
+                return PARSE_ERROR;
             }
 
             buf->set_pos(p);
@@ -347,7 +356,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             case CR:
             case LF:
-                return PARSE_INVALID_REQUEST;
+                return PARSE_ERROR;
             }
 
             break;
@@ -356,10 +365,11 @@ int http_parse_request_line(HttpRequest* req) {
             switch (ch) {
             case ' ':
                 state = PARSE_VERSION_H;
+                buf->set_pos(p);
                 break;
             case CR:
             case LF:
-                return PARSE_INVALID_REQUEST;
+                return PARSE_ERROR;
             }
 
             break;
@@ -374,7 +384,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_INVALID_REQUEST;
+            return PARSE_ERROR;
 
         case PARSE_VERSION_HT:
             if (ch == 'T') {
@@ -382,7 +392,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_INVALID_REQUEST;
+            return PARSE_ERROR;
 
         case PARSE_VERSION_HTT:
             if (ch == 'T') {
@@ -390,7 +400,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_INVALID_REQUEST;
+            return PARSE_ERROR;
 
         case PARSE_VERSION_HTTP:
             if (ch == 'P') {
@@ -398,7 +408,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_INVALID_REQUEST;
+            return PARSE_ERROR;
 
         case PARSE_VERSION_HTTP_SLASH:
             if (ch == '/') {
@@ -406,7 +416,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_INVALID_REQUEST;
+            return PARSE_ERROR;
 
         case PARSE_VERSION_HTTP_SLASH_NUMBER:
             if (ch >= '0' && ch <= '9') {
@@ -415,7 +425,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_INVALID_REQUEST;
+            return PARSE_ERROR;
 
         case PARSE_VERSION_HTTP_SLASH_VERSION:
             if ((ch >= '0' && ch <= '9') || ch == '.') {
@@ -437,7 +447,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_INVALID_REQUEST;
+            return PARSE_ERROR;
 
         case PARSE_LAST_CR:
             switch (ch) {
@@ -451,20 +461,187 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_INVALID_REQUEST;
+            return PARSE_ERROR;
 
         case PARSE_LAST_CR_LF:
             if (ch == LF) {
-                return PARSE_OK;
+                req->set_parse_state(PARSE_START);
+                return PARSE_SUCCESS;
             }
 
-            return PARSE_INVALID_REQUEST;
+            return PARSE_ERROR;
         }
     }
 
     req->set_parse_state(state);
-    req->set_last_parse(last - buf->get_pos());
+    req->set_buf_offset(last - buf->get_pos());
     return PARSE_AGAIN;
+}
+
+int http_parse_request_headers(HttpRequest* req) {
+    static uint8_t valid[] = {
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,     // 0
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,     // 16
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,     // 32
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0,     // 48
+        0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,     // 64
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0,     // 80
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,     // 96
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0,     // 112
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,     // 128
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,     // 144
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,     // 160
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,     // 176
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,     // 192
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,     // 208
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,     // 224
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,     // 240
+    };
+
+    int state = req->get_parse_state();
+    Buffer *buf = req->get_recv_buf();
+    char *last = buf->get_last();
+    char ch;
+
+    for (char *p = buf->get_pos() + req->get_buf_offset(); p < last; ++p) {
+        ch = *p;
+
+        // allow underscores
+        switch (state) {
+        case PARSE_START:
+            if (valid[static_cast<uint8_t>(ch)]) {
+                buf->set_pos(p);
+                state = PARSE_HEADERS_NAME;
+                break;
+            }
+
+            switch (ch) {
+            case CR:
+                state = PARSE_LAST_CR_LF_CR_LF;
+                break;
+            case LF:
+                state = PARSE_DONE;
+                break;
+            default:
+                return PARSE_ERROR;
+            }
+
+            break;
+
+        case PARSE_HEADERS_NAME:
+            if (valid[static_cast<uint8_t>(ch)]) {
+                break;
+            }
+
+            switch (ch) {
+            case ':':
+                req->set_headers_in_name(buf->get_pos(), p);
+                buf->set_pos(p);
+                state = PARSE_HEADERS_COLON;
+                break;
+            default:
+                return PARSE_ERROR;
+            }
+
+            break;
+
+        case PARSE_HEADERS_COLON:
+            if (valid[static_cast<uint8_t>(ch)]) {
+                buf->set_pos(p);
+                state = PARSE_HEADERS_VALUE;
+                break;
+            }
+
+            switch (ch) {
+            case ' ':
+                break;
+            default:
+                return PARSE_ERROR;
+            }
+
+            break;
+
+        case PARSE_HEADERS_VALUE:
+            if (valid[static_cast<uint8_t>(ch)]) {
+                break;
+            }
+
+            switch (ch) {
+            case ' ':
+                req->set_headers_in_value(buf->get_pos(), p);
+                buf->set_pos(p);
+                state = PARSE_LAST_CR;
+                break;
+            case CR:
+                req->set_headers_in_value(buf->get_pos(), p);
+                buf->set_pos(p);
+                state = PARSE_LAST_CR_LF;
+                break;
+            case LF:
+                req->set_headers_in_value(buf->get_pos(), p);
+                buf->set_pos(p);
+                state = PARSE_LAST_CR_LF_CR;
+                break;
+            default:
+                return PARSE_ERROR;
+            }
+
+            break;
+
+        case PARSE_LAST_CR:
+            switch (ch) {
+            case ' ':
+                break;
+            case CR:
+                state = PARSE_LAST_CR_LF;
+                break;
+            case LF:
+                state = PARSE_START;
+                break;
+            }
+
+            return PARSE_ERROR;
+
+        case PARSE_LAST_CR_LF:
+            if (ch == LF) {
+                state = PARSE_START;
+                break;
+            }
+
+            return PARSE_ERROR;
+
+        case PARSE_LAST_CR_LF_CR:
+            if (ch == CR) {
+                state = PARSE_LAST_CR_LF_CR_LF;
+                break;
+            }
+
+            if (ch == LF) {
+                return PARSE_SUCCESS;
+            }
+
+            return PARSE_ERROR;
+
+        case PARSE_LAST_CR_LF_CR_LF:
+            if (ch == LF) {
+                return PARSE_SUCCESS;
+            }
+
+            return PARSE_ERROR;
+        }
+    }
+
+    req->set_parse_state(state);
+    req->set_buf_offset(last - buf->get_pos());
+    return PARSE_AGAIN;
+}
+
+int http_parse_quoted(HttpRequest* req) {
+    return PARSE_SUCCESS;
+}
+
+int http_parse_args(HttpRequest* req) {
+    return PARSE_SUCCESS;
 }
 
 }

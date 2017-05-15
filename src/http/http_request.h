@@ -91,21 +91,34 @@ public:
 
     Buffer* get_recv_buf() const { return recv_buf.get(); }
 
-    int get_last_parse() const { return last_parse; }
-    void set_last_parse(int n) { last_parse = n; }
+    int get_buf_offset() const { return buf_offset; }
+    void set_buf_offset(int n) { buf_offset = n; }
 
+    bool is_quoted() const { return quoted; }
+    void set_quoted(bool q) { quoted = q; }
+
+    void set_headers_in_name(const char* p1, const char* p2);
+    void set_headers_in_value(const char* p1, const char* p2);
+
+    std::string get_headers_in(const char* s) const;
+
+    void finalize(int state) {}
     void close(int state) {}
 
 private:
     HttpMethod http_method;
     int parse_state;
-    int last_parse;
+    int buf_offset;
     // void** ctx;
     http_req_handler_t read_handler;
     http_req_handler_t write_handler;
     std::unique_ptr<Buffer> recv_buf;
     std::unordered_map<std::string, std::string> headers_in;
     std::unordered_map<std::string, std::string> headers_out;
+
+    uint32_t quoted:1;
+
+    std::string name;
 
     std::string method;
     std::string schema;
@@ -115,6 +128,14 @@ private:
     std::string args;
     std::string version;
 };
+
+inline void HttpRequest::set_headers_in_name(const char* p1, const char* p2) {
+    name = std::string(p1, p2);
+}
+
+inline void HttpRequest::set_headers_in_value(const char* p1, const char* p2) {
+    headers_in.emplace(std::move(name), std::string(p1, p2));
+}
 
 class HttpConnection: public ConnectionContext {
 public:

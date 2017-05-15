@@ -6,14 +6,18 @@
 namespace servx {
 
 enum HttpParseResult {
-    PARSE_OK,
+    PARSE_SUCCESS,
     PARSE_AGAIN,
-    PARSE_INVALID_METHOD,
-    PARSE_INVALID_REQUEST,
     PARSE_ERROR
 };
 
 int http_parse_request_line(HttpRequest* req);
+
+int http_parse_request_headers(HttpRequest* req);
+
+int http_parse_quoted(HttpRequest* req);
+
+int http_parse_args(HttpRequest* req);
 
 }
 

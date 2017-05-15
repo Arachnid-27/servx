@@ -23,7 +23,7 @@ void Buffer::shrink() {
     }
 }
 
-void Buffer::resize(int sz) {
+void Buffer::enlarge(int sz) {
     if (sz > size) {
         auto offset = last - pos;
         char *new_start = new char[sz];

@@ -5,41 +5,47 @@
 
 namespace servx {
 
-int recv(Connection* conn, size_t size) {
-    Buffer *buf = conn->get_recv_buf();
-    int n;
+int recv(Connection* conn, Buffer* buf) {
+    Event *ev = conn->get_read_event();
+    int n, size = buf->get_remain();
+
+    if (size == 0) {
+        return IO_BUF_TOO_SMALL;
+    }
 
     // Todo EPOLLRDHUP
 
     while (true) {
-        n = ::read(conn->get_fd(), buf->get_pos(), size);
+        n = ::read(conn->get_fd(), buf->get_last(), size);
 
         if (n > 0) {
-            if (static_cast<size_t>(n) < size) {
-                conn->get_read_event()->set_ready(false);
+            if (n < size) {
+                ev->set_ready(false);
             }
 
-            buf->set_last(buf->get_pos() + n);
+            buf->set_last(buf->get_last() + n);
 
-            return n;
+            return IO_SUCCESS;
         }
 
         if (n == 0) {
-            conn->get_read_event()->set_ready(false);
-            conn->get_read_event()->set_eof(true);
-            return 0;
+            ev->set_ready(false);
+            ev->set_eof(true);
+            return IO_FINISH;
         }
 
         if (errno == EINTR) {
             continue;
         }
 
-        if (errno != EAGAIN) {
-            conn->get_read_event()->set_error(true);
-        }
-        conn->get_read_event()->set_ready(false);
+        ev->set_ready(false);
 
-        return n;
+        if (errno == EAGAIN) {
+            return IO_BLOCK;
+        }
+
+        ev->set_error(true);
+        return IO_ERROR;
     }
 }
 

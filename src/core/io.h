@@ -5,7 +5,15 @@
 
 namespace servx {
 
-int recv(Connection* conn, size_t sz);
+enum IOResultCode {
+    IO_SUCCESS,
+    IO_FINISH,
+    IO_ERROR,
+    IO_BLOCK,
+    IO_BUF_TOO_SMALL
+};
+
+int recv(Connection* conn, Buffer* buf);
 
 }
 

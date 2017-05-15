@@ -25,7 +25,7 @@ public:
 
     void reset();
     void shrink();
-    void resize(int sz);
+    void enlarge(int sz);
 
 private:
     int size;
