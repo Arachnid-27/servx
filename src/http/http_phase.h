@@ -20,6 +20,8 @@ using phase_handler_t = std::function<int (const HttpRequest&)>;
 class HttpPhaseHandler {
 };
 
+void http_run_phases(HttpRequest* req);
+
 }
 
 #endif

@@ -44,7 +44,7 @@ public:
     bool is_timeout() const { return timeout; }
 
     void handle() { handler(this); }
-    void set_handler(const std::function<void(Event*)> f) { handler = f; }
+    void set_handler(const std::function<void(Event*)>& h) { handler = h; }
 
     void expire();
 
@@ -76,7 +76,6 @@ public:
     ~Connection() = default;
 
     bool open(int fd, bool lst = false);
-
     void close();
 
     bool is_close() const { return socket_fd == -1; }
@@ -88,7 +87,6 @@ public:
     int get_fd() const { return socket_fd; }
 
     Event* get_read_event() { return &read_event; }
-
     Event* get_write_event() { return &write_event; }
 
     uint64_t get_conn_id() const { return conn_id; }
@@ -97,7 +95,8 @@ public:
 
     template <class T>
     void set_context(T* c) { ctx = std::unique_ptr<T>(c); }
-    ConnectionContext* get_context() const { return ctx.get(); }
+    template <class T>
+    T* get_context() const { return static_cast<T*>(ctx.get());}
 
     void init_recv_buf(int sz);
 

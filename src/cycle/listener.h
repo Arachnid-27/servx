@@ -27,9 +27,9 @@ public:
     int open_socket() { return socket->open_socket(); }
 
     template <class T>
+    T* get_servers() { return static_cast<T*>(servers.get()); }
+    template <class T>
     void set_servers(T* p) { servers = std::unique_ptr<T>(p); }
-
-    ListeningServers* get_servers() { return servers.get(); }
 
     const std::shared_ptr<TcpSocket>& get_socket() const { return socket; }
 
@@ -39,7 +39,7 @@ public:
 
     Connection* get_connection() { return conn; }
 
-    void set_handler(const std::function<void(Connection*)> h) { handler = h; }
+    void set_handler(const std::function<void(Connection*)>& h) { handler = h; }
 
     void handle(Connection* c) { handler(c); }
 

@@ -82,9 +82,15 @@ inline bool add_connection(Connection* c) {
     return ModuleManager::instance()->get_conf<MainEventModule>()
         ->module->add_connection(c);
 }
+
 inline bool del_connection(Connection* c) {
     return ModuleManager::instance()->get_conf<MainEventModule>()
         ->module->del_connection(c);
+}
+
+inline void process_event() {
+    ModuleManager::instance()->get_conf<MainEventModule>()
+        ->module->process_events();
 }
 
 }

@@ -94,7 +94,7 @@ bool MainHttpModule::address_post_handler() {
         return false;
     }
 
-    HttpServers *hs = static_cast<HttpServers*>(lst->get_servers());
+    HttpServers *hs = lst->get_servers<HttpServers>();
     if (hs == nullptr) {
         hs = new HttpServers;
         lst->set_servers(hs);

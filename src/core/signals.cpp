@@ -24,7 +24,7 @@ bool set_timer(int value) {
     itv.it_interval.tv_sec = value / 1000;
     itv.it_interval.tv_usec = (value % 1000) * 1000;
     itv.it_value.tv_sec = value / 1000;
-    itv.it_value.tv_sec = (value % 1000) * 1000;
+    itv.it_value.tv_usec = (value % 1000) * 1000;
 
     return setitimer(ITIMER_REAL, &itv, NULL) != -1;
 }

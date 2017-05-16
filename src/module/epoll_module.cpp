@@ -3,7 +3,9 @@
 #include <errno.h>
 
 #include "clock.h"
+#include "logger.h"
 #include "module_manager.h"
+#include "signals.h"
 
 namespace servx {
 
@@ -36,26 +38,30 @@ bool EpollModule::add_event(Event* ev, int flags) {
     if (ev->is_write_event()) {
         active = c->get_read_event()->is_active();
         prev = EPOLLIN | EPOLLRDHUP;
+        ee.events = EPOLLOUT;
     } else {
         active = c->get_write_event()->is_active();
         prev = EPOLLOUT;
+        ee.events = EPOLLIN | EPOLLRDHUP;
     }
 
     if (active) {
         op = EPOLL_CTL_MOD;
-        flags |= prev;
+        ee.events |= prev;
     } else {
         op = EPOLL_CTL_ADD;
     }
 
     // EPOLLEXCLUSIVE since Linux 4.5.0
 
-    ee.events = flags;
-    ee.data.ptr = c;
-
     if (!c->is_listen()) {
         ee.events |= EPOLLET;
     }
+
+    ee.data.ptr = c;
+
+    Logger::instance()->debug("call epoll_ctl op = %d, fd = %d flags = %d",
+        op, c->get_fd(), ee.events);
 
     if (epoll_ctl(ep, op, c->get_fd(), &ee) == -1) {
         return false;
@@ -69,7 +75,7 @@ bool EpollModule::add_event(Event* ev, int flags) {
 bool EpollModule::del_event(Event* ev, int flags) {
     Connection *c = ev->get_connection();
 
-    if (c->get_fd() == -1) {
+    if (c->is_close()) {
         ev->set_active(false);
         return true;
     }
@@ -88,7 +94,7 @@ bool EpollModule::del_event(Event* ev, int flags) {
 
     if (active) {
         op = EPOLL_CTL_MOD;
-        ee.events = prev | flags;
+        ee.events = prev;
         ee.data.ptr = c;
 
         if (!c->is_listen()) {
@@ -126,9 +132,10 @@ bool EpollModule::add_connection(Connection* c) {
     return true;
 }
 
-
 bool EpollModule::del_connection(Connection* c) {
-    if (c->is_close()) {
+    if (!c->is_close()) {
+        // if fd is closed, it will be deleted by epoll
+        // so we can not call epoll_ctl
         epoll_event ee;
 
         ee.events = 0;
@@ -145,17 +152,18 @@ bool EpollModule::del_connection(Connection* c) {
     return true;
 }
 
-
 bool EpollModule::process_events() {
+    Logger::instance()->debug("epoll wait...");
+
     int n = epoll_wait(ep, event_list, conf.epoll_events, -1);
 
-    if (true) { // Todo wake up by SIGALRM
-        Clock::instance()->update();
-    }
+    Logger::instance()->debug("epoll return, get %d", n);
 
     if (n == -1) {
         if (errno == EINTR) {
-            if (true) { // Todo wake up by SIGALRM
+            if (sig_timer_alarm) {
+                Clock::instance()->update();
+                sig_timer_alarm = 0;
                 return true;
             }
         }
@@ -175,6 +183,7 @@ bool EpollModule::process_events() {
         c = static_cast<Connection*>(event_list[i].data.ptr);
 
         if (c->is_close()) {    // Todo handle stale event
+            Logger::instance()->info("connection already closed");
             continue;
         }
 
@@ -187,6 +196,8 @@ bool EpollModule::process_events() {
         event = c->get_read_event();
 
         if ((flags & EPOLLIN) && event->is_active()) {
+            Logger::instance()->debug("handle read event...");
+
             if (flags & EPOLLRDHUP) {
                 // Todo
             }

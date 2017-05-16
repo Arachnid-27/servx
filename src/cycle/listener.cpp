@@ -28,7 +28,7 @@ Listening* Listener::push_address(const std::shared_ptr<TcpSocket>& socket) {
     vec.emplace_back(new Listening(socket));
     listenings.push_back(vec.back().get());
 
-    return vec.back().get();
+    return listenings.back();
 }
 
 bool Listener::init_listenings() {
@@ -92,7 +92,12 @@ bool Listener::open_listenings() {
         }
 
         conn->get_read_event()->set_handler(
-            [&](Event* ev) { accept_event_handler(lst, ev); });
+            [lst](Event* ev) { accept_event_handler(lst, ev); });
+
+        if (!add_event(conn->get_read_event(), 0)) {
+            Logger::instance()->error("can not add event");
+            return false;
+        }
         lst->set_connection(conn);
     }
 
@@ -132,6 +137,8 @@ bool Listener::disable_all() {
 Listening* Listener::find_listening(sockaddr* addr) {
     auto iter = ports.find(get_port_from_sockaddr(addr));
     if (iter == ports.end()) {
+        Logger::instance()->alert("can not find port %d",
+                                  get_port_from_sockaddr(addr));
         return nullptr;
     }
 

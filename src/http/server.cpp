@@ -1,5 +1,7 @@
 #include "server.h"
 
+#include <algorithm>
+
 #include "module_manager.h"
 
 namespace servx {
@@ -39,6 +41,16 @@ bool HttpServers::push_server(Server* srv, bool def) {
     servers.push_back(srv);
 
     return true;
+}
+
+Server* HttpServers::search_server(const std::string& name) {
+    auto iter = std::find_if(servers.begin(), servers.end(),
+        [&](const Server* srv) { return srv->contain_server_name(name); });
+
+    if (iter != servers.end()) {
+        return *iter;
+    }
+    return default_server;
 }
 
 }

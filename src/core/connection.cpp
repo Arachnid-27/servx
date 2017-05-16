@@ -4,6 +4,11 @@
 
 #include <cstring>
 
+#include "connection_pool.h"
+#include "event_module.h"
+#include "logger.h"
+#include "timer.h"
+
 namespace servx {
 
 Event::Event(Connection* c, bool w)
@@ -38,30 +43,48 @@ bool Connection::open(int fd, bool lst) {
     conn_id = ++count;
     listen = lst;
 
-    sockaddr sa;
-    socklen_t len;
+    char sa[sizeof(sockaddr_in6)];
+    socklen_t len = sizeof(sockaddr_in6);
 
-    if (getsockname(fd, &sa, &len) == -1) {
+    if (getsockname(fd, reinterpret_cast<sockaddr*>(sa), &len) == -1) {
+        Logger::instance()->error("get peer sockaddr failed");
         return false;
     }
-    local_addr.set_addr(&sa, len);
+    local_addr.set_addr(reinterpret_cast<sockaddr*>(sa), len);
 
     return true;
 }
 
 void Connection::close() {
-    if (::close(socket_fd) == -1) {
-        // err_log
+    if (socket_fd == -1) {
+        Logger::instance()->warn("connection already closed");
+        return;
     }
+
+    if (read_event.is_timer()) {
+        Timer::instance()->del_timer(&read_event);
+    }
+
+    if (write_event.is_timer()) {
+        Timer::instance()->del_timer(&write_event);
+    }
+
+    del_connection(this);
+
+    ctx.release();
+    recv_buf.release();
+
+    ConnectionPool::instance()->ret_connection(this);
+
+    if (::close(socket_fd) == -1) {
+        Logger::instance()->warn("close %d failed", socket_fd);
+    }
+
     socket_fd = -1;
 }
 
 void Connection::init_recv_buf(int sz) {
-    if (sz <= recv_buf->get_size()) {
-        recv_buf->reset();
-    } else {
-        recv_buf = std::unique_ptr<Buffer>(new Buffer(sz));
-    }
+    recv_buf = std::unique_ptr<Buffer>(new Buffer(sz));
 };
 
 }

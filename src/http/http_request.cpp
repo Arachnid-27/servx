@@ -1,7 +1,11 @@
 #include "http_request.h"
 
+#include <cstdlib>
+
+#include "connection_pool.h"
 #include "event_module.h"
 #include "http_parse.h"
+#include "http_phase.h"
 #include "io.h"
 #include "logger.h"
 #include "timer.h"
@@ -10,7 +14,9 @@ namespace servx {
 
 HttpRequest::HttpRequest(Buffer* buf)
     : http_method(METHOD_UNKONWN), parse_state(0),
-      buf_offset(0), recv_buf(buf) {
+      buf_offset(0), content_length(-1),
+      recv_buf(buf), server(nullptr),
+      quoted(false), chunked(false), keep_alive(false) {
 }
 
 std::string HttpRequest::get_headers_in(const char* s) const {
@@ -21,12 +27,13 @@ std::string HttpRequest::get_headers_in(const char* s) const {
     return iter->second;
 }
 
-void close_http_connection(Connection* conn);
+void http_request_handler(Event* ev) {
+}
 
 void http_wait_request_handler(Event* ev) {
     Connection *conn = ev->get_connection();
     if (ev->is_timeout()) {
-        close_http_connection(conn);
+        conn->close();
         return;
     }
 
@@ -35,10 +42,14 @@ void http_wait_request_handler(Event* ev) {
         conn->init_recv_buf(4096);
     }
 
+    Logger::instance()->debug("recv data...");
+
     int rc = recv(conn, conn->get_recv_buf());
 
+    Logger::instance()->debug("recv return, get %d", rc);
+
     if (rc == IO_ERROR) {
-        close_http_connection(conn);
+        conn->close();
         return;
     }
 
@@ -46,12 +57,11 @@ void http_wait_request_handler(Event* ev) {
         // if event already exists in timer
         // it will delete the old one and insert
         Timer::instance()->add_timer(ev, 60000);
-
-        // Todo enable reuse connection
+        ConnectionPool::instance()->enable_reusable(conn);
 
         if (!ev->is_active()) {
             if (!add_event(ev, 0)) {
-                close_http_connection(conn);
+                conn->close();
                 return;
             }
         }
@@ -62,25 +72,21 @@ void http_wait_request_handler(Event* ev) {
     if (rc == IO_FINISH) {
         // first time recv 0 byte
         Logger::instance()->info("client closed connection");
-        close_http_connection(conn);
+        conn->close();
         return;
     }
 
-    // Todo disable reuse connection
+    ConnectionPool::instance()->disable_reusable(conn);
 
     HttpRequest *req = new HttpRequest(conn->relase_recv_buf());
     // req->set_read_handler(http_block_reading);
 
-    HttpConnection *hc = static_cast<HttpConnection*>(conn->get_context());
+    HttpConnection *hc = conn->get_context<HttpConnection>();
     hc->set_request(req);
 
     // prepare to process request line
     ev->set_handler(http_process_request_line);
     ev->handle();
-}
-
-inline HttpConnection* get_http_connection(Connection* conn) {
-    return static_cast<HttpConnection*>(conn->get_context());
 }
 
 int http_read_request_header(Event* ev, HttpRequest* req) {
@@ -106,7 +112,7 @@ int http_read_request_header(Event* ev, HttpRequest* req) {
 
             if (rc == IO_FINISH || rc == IO_ERROR) {
                 if (rc == IO_FINISH) {
-                    Logger::instance()->info("client prematurely closed connection");
+                    Logger::instance()->info("client prematurely closed connetion");
                 }
                 req->finalize(HTTP_BAD_REQUEST);
             }
@@ -130,7 +136,7 @@ int http_read_request_header(Event* ev, HttpRequest* req) {
 
 void http_process_request_headers(Event* ev) {
     Connection *conn = ev->get_connection();
-    HttpRequest *req = get_http_connection(conn)->get_request();
+    HttpRequest *req = conn->get_context<HttpConnection>()->get_request();
 
     if (ev->is_timeout()) {
         Logger::instance()->info("%d client time out", HTTP_REQUEST_TIME_OUT);
@@ -158,12 +164,45 @@ void http_process_request_headers(Event* ev) {
                 req->finalize(HTTP_BAD_REQUEST);
                 return;
             } else {
-                // Todo find server
+                auto ctx = conn->get_context<HttpConnection>();
+                Server *srv = ctx->get_servers()->search_server(host);
+                req->set_server(srv);
             }
 
-            // Todo content-length
-            // Todo chunk
-            // Todo keep-alive
+            auto length = req->get_headers_in("content-length");
+            if (!length.empty()) {
+                int n = atoi(length.c_str());
+                if (n == 0 && length != "0") {
+                    req->finalize(HTTP_BAD_REQUEST);
+                    return;
+                }
+                req->set_content_length(n);
+            }
+
+            auto encoding = req->get_headers_in("transfer-encoding");
+            if (encoding == "chunked") {
+                req->set_chunked(true);
+            } else if (encoding != "identity") {
+                Logger::instance()->error("unknown encoding %s",
+                                          encoding.c_str());
+                req->finalize(HTTP_NOT_IMPLEMENTED);
+            }
+
+            auto connection = req->get_headers_in("connection");
+            if (connection == "keep-alive") {
+                req->set_keep_alive(true);
+            }
+
+            if (conn->get_read_event()->is_timer()) {
+                Timer::instance()->del_timer(conn->get_read_event());
+            }
+
+            conn->get_read_event()->set_handler(http_request_handler);
+            conn->get_write_event()->set_handler(http_request_handler);
+            req->set_read_handler(http_block_reading);
+            req->set_write_handler(http_run_phases);
+
+            return;
         }
 
         if (rc != PARSE_AGAIN) {
@@ -175,7 +214,7 @@ void http_process_request_headers(Event* ev) {
 
 void http_process_request_line(Event* ev) {
     Connection *conn = ev->get_connection();
-    HttpRequest *req = get_http_connection(conn)->get_request();
+    HttpRequest *req = conn->get_context<HttpConnection>()->get_request();
 
     if (ev->is_timeout()) {
         Logger::instance()->info("%d client time out", HTTP_REQUEST_TIME_OUT);
@@ -248,25 +287,27 @@ void http_process_request_line(Event* ev) {
     }
 }
 
-void http_empty_handler(Event* ev) {}
-
 void http_init_connection(Connection* conn) {
     // we don't add write event until we send response
     if (!add_event(conn->get_read_event(), 0)) {
-        close_http_connection(conn);
+        Logger::instance()->error("can not add event");
+        conn->close();
         return;
     }
+
+    Logger::instance()->debug("find listening...");
 
     auto lst = Listener::instance()
         ->find_listening(conn->get_local_sockaddr());
     auto rev = conn->get_read_event();
 
+    Logger::instance()->debug("find listening success, is_wildcard = %d",
+                               lst->get_socket()->is_wildcard());
+
     rev->set_handler(http_wait_request_handler);
-    conn->get_write_event()->set_handler(http_empty_handler);
 
     HttpConnection *hc = new HttpConnection;
-    hc->set_server(static_cast<HttpServers*>(lst->get_servers())
-        ->get_default_server());
+    hc->set_servers(lst->get_servers<HttpServers>());
     conn->set_context(hc);
 
     if (rev->is_ready()) { // deferred_accept
@@ -276,10 +317,11 @@ void http_init_connection(Connection* conn) {
 
     // Todo custom timeout
     Timer::instance()->add_timer(conn->get_read_event(), 60000);
-    // Todo enable reuse connection
+    ConnectionPool::instance()->enable_reusable(conn);
+
+    Logger::instance()->debug("init connection success");
 }
 
-void close_http_connection(Connection* conn) {
-}
+void http_block_reading(HttpRequest* req) {}
 
 }

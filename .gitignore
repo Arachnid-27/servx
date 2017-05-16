@@ -1,4 +1,5 @@
 servx
 *.o
 *.swp
+*.sh
 log/

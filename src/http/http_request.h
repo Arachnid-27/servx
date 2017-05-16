@@ -5,9 +5,6 @@
 
 #include "server.h"
 
-#define set_req_attr(attr)           \
-    attr = std::string(p1, p2);
-
 namespace servx {
 
 enum HttpMethod {
@@ -64,13 +61,13 @@ public:
     HttpMethod get_http_method() const { return http_method; }
     void set_method(HttpMethod hm) { http_method = hm; }
 
-    void set_method(const char* p1, const char* p2) { set_req_attr(method); }
-    void set_schema(const char* p1, const char* p2) { set_req_attr(schema); }
-    void set_host(const char* p1, const char* p2) { set_req_attr(host); }
-    void set_port(const char* p1, const char* p2) { set_req_attr(port); }
-    void set_uri(const char* p1, const char* p2) { set_req_attr(uri); }
-    void set_args(const char* p1, const char* p2) { set_req_attr(args); }
-    void set_version(const char* p1, const char* p2) { set_req_attr(version); }
+    void set_method(std::string&& s) { method = std::move(s); }
+    void set_schema(std::string&& s) { schema = std::move(s); }
+    void set_host(std::string&& s) { host = std::move(s); }
+    void set_port(std::string&& s) { port = std::move(s); }
+    void set_uri(std::string&& s) { uri = std::move(s); }
+    void set_args(std::string&& s) { args = std::move(s); }
+    void set_version(std::string&& s) { version = std::move(s); }
 
     const std::string& get_method() const { return method; }
     const std::string& get_schema() const { return schema; }
@@ -94,11 +91,25 @@ public:
     int get_buf_offset() const { return buf_offset; }
     void set_buf_offset(int n) { buf_offset = n; }
 
+    Server* get_server() const { return server; }
+    void set_server(Server* srv) { server = srv; }
+
     bool is_quoted() const { return quoted; }
     void set_quoted(bool q) { quoted = q; }
 
-    void set_headers_in_name(const char* p1, const char* p2);
-    void set_headers_in_value(const char* p1, const char* p2);
+    bool is_chunked() const { return chunked; }
+    void set_chunked(bool c) { chunked = c; }
+
+    bool is_keep_alive() const { return keep_alive; }
+    void set_keep_alive(bool k) { keep_alive = k; }
+
+    int get_content_length() const { return content_length; }
+    void set_content_length(int n) { content_length = n; }
+
+    bool is_lingering_close() const { return content_length > 0 || chunked; }
+
+    void set_headers_in_name(std::string&& s) { name = std::move(s); }
+    void set_headers_in_value(std::string&& s);
 
     std::string get_headers_in(const char* s) const;
 
@@ -109,6 +120,7 @@ private:
     HttpMethod http_method;
     int parse_state;
     int buf_offset;
+    int content_length;
     // void** ctx;
     http_req_handler_t read_handler;
     http_req_handler_t write_handler;
@@ -116,7 +128,11 @@ private:
     std::unordered_map<std::string, std::string> headers_in;
     std::unordered_map<std::string, std::string> headers_out;
 
+    Server *server;
+
     uint32_t quoted:1;
+    uint32_t chunked:1;
+    uint32_t keep_alive:1;
 
     std::string name;
 
@@ -129,23 +145,20 @@ private:
     std::string version;
 };
 
-inline void HttpRequest::set_headers_in_name(const char* p1, const char* p2) {
-    name = std::string(p1, p2);
-}
-
-inline void HttpRequest::set_headers_in_value(const char* p1, const char* p2) {
-    headers_in.emplace(std::move(name), std::string(p1, p2));
+inline void HttpRequest::set_headers_in_value(std::string&& s) {
+    headers_in.emplace(std::move(name), std::move(s));
 }
 
 class HttpConnection: public ConnectionContext {
 public:
-    void set_server(Server* srv) { server = srv; }
+    HttpServers* get_servers() const { return servers; }
+    void set_servers(HttpServers* srv) { servers = srv; }
 
     HttpRequest* get_request() const { return request.get(); }
     void set_request(HttpRequest* req);
 
 private:
-    Server *server;
+    HttpServers *servers;
     std::unique_ptr<HttpRequest> request;
 };
 

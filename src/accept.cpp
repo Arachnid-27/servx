@@ -35,8 +35,12 @@ void accept_event_handler(Listening* lst, Event* ev) {
 
     ev->set_ready(false);   //
 
+    Logger::instance()->debug("call accept4...");
+
     while (true) {
         fd = accept4(conn->get_fd(), &sa, &len, SOCK_NONBLOCK);
+
+        Logger::instance()->debug("accept4 return, get %d", fd);
 
         if (fd == -1) {
             err = errno;
@@ -68,21 +72,23 @@ void accept_event_handler(Listening* lst, Event* ev) {
             return;
         }
 
-        Connection *conn = ConnectionPool::instance()->get_connection(fd);
-        if (conn == nullptr) {
+        Connection *new_conn = ConnectionPool::instance()->get_connection(fd);
+        if (new_conn == nullptr) {
+            Logger::instance()->warn("can not get connection");
             if (::close(fd) == -1) {
                 Logger::instance()->warn("close fd %d failed", fd);
-                return;
             }
+            return;
         }
-        conn->set_peer_sockaddr(&sa, len);
+        new_conn->set_peer_sockaddr(&sa, len);
 
-        conn->get_write_event()->set_ready(true); // enable write event
+        new_conn->get_write_event()->set_ready(true); // enable write event
         if (lst->get_socket()->is_deferred_accept()) {
-            conn->get_read_event()->set_ready(true);
+            new_conn->get_read_event()->set_ready(true);
         }
 
-        lst->handle(conn);
+        Logger::instance()->debug("handle listening event");
+        lst->handle(new_conn);
 
         if (!multi) {
             break;
