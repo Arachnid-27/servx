@@ -84,6 +84,8 @@ void http_wait_request_handler(Event* ev) {
     HttpConnection *hc = conn->get_context<HttpConnection>();
     hc->set_request(req);
 
+    Logger::instance()->debug("prepare to process request line");
+
     // prepare to process request line
     ev->set_handler(http_process_request_line);
     ev->handle();
@@ -112,7 +114,7 @@ int http_read_request_header(Event* ev, HttpRequest* req) {
 
             if (rc == IO_FINISH || rc == IO_ERROR) {
                 if (rc == IO_FINISH) {
-                    Logger::instance()->info("client prematurely closed connetion");
+                    Logger::instance()->info("client prematurely closed connection");
                 }
                 req->finalize(HTTP_BAD_REQUEST);
             }
@@ -137,6 +139,7 @@ int http_read_request_header(Event* ev, HttpRequest* req) {
 void http_process_request_headers(Event* ev) {
     Connection *conn = ev->get_connection();
     HttpRequest *req = conn->get_context<HttpConnection>()->get_request();
+    Buffer *buf = req->get_recv_buf();
 
     if (ev->is_timeout()) {
         Logger::instance()->info("%d client time out", HTTP_REQUEST_TIME_OUT);
@@ -148,11 +151,15 @@ void http_process_request_headers(Event* ev) {
     int rc;
 
     while (true) {
-        rc = http_read_request_header(ev, req);
+        if (buf->get_pos() + req->get_buf_offset() == buf->get_last()) {
+            rc = http_read_request_header(ev, req);
 
-        if (rc != IO_SUCCESS) {
-            return;
+            if (rc != IO_SUCCESS) {
+                return;
+            }
         }
+
+        Logger::instance()->debug("parsing request header...");
 
         rc = http_parse_request_headers(req);
 
@@ -161,12 +168,17 @@ void http_process_request_headers(Event* ev) {
 
             auto host = req->get_headers_in("host");
             if (host.empty()) {
+                Logger::instance()->error("can not find host");
                 req->finalize(HTTP_BAD_REQUEST);
                 return;
             } else {
                 auto ctx = conn->get_context<HttpConnection>();
                 Server *srv = ctx->get_servers()->search_server(host);
                 req->set_server(srv);
+
+                if (srv == ctx->get_servers()->get_default_server()) {
+                    Logger::instance()->debug("use default server");
+                }
             }
 
             auto length = req->get_headers_in("content-length");
@@ -182,20 +194,24 @@ void http_process_request_headers(Event* ev) {
             auto encoding = req->get_headers_in("transfer-encoding");
             if (encoding == "chunked") {
                 req->set_chunked(true);
-            } else if (encoding != "identity") {
+            } else if (!encoding.empty() && encoding != "identity") {
                 Logger::instance()->error("unknown encoding %s",
                                           encoding.c_str());
                 req->finalize(HTTP_NOT_IMPLEMENTED);
+                return;
             }
 
             auto connection = req->get_headers_in("connection");
             if (connection == "keep-alive") {
+                Logger::instance()->debug("connection keep-alive");
                 req->set_keep_alive(true);
             }
 
             if (conn->get_read_event()->is_timer()) {
                 Timer::instance()->del_timer(conn->get_read_event());
             }
+
+            Logger::instance()->debug("prepare to run phases");
 
             conn->get_read_event()->set_handler(http_request_handler);
             conn->get_write_event()->set_handler(http_request_handler);
@@ -215,6 +231,7 @@ void http_process_request_headers(Event* ev) {
 void http_process_request_line(Event* ev) {
     Connection *conn = ev->get_connection();
     HttpRequest *req = conn->get_context<HttpConnection>()->get_request();
+    Buffer *buf = req->get_recv_buf();
 
     if (ev->is_timeout()) {
         Logger::instance()->info("%d client time out", HTTP_REQUEST_TIME_OUT);
@@ -226,11 +243,15 @@ void http_process_request_line(Event* ev) {
     int rc;
 
     while (true) {
-        rc = http_read_request_header(ev, req);
+        if (buf->get_pos() + req->get_buf_offset() == buf->get_last()) {
+            rc = http_read_request_header(ev, req);
 
-        if (rc != IO_SUCCESS) {
-            return;
+            if (rc != IO_SUCCESS) {
+                return;
+            }
         }
+
+        Logger::instance()->debug("parsing request line...");
 
         rc = http_parse_request_line(req);
 
