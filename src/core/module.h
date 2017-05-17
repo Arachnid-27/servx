@@ -22,6 +22,7 @@ enum ModuleIndex {
     MAIN_EVENT_MODULE,
     EPOLL_MODULE,
     MAIN_HTTP_MODULE,
+    HTTP_STATIC_MODULE,
     NULL_MODULE
 };
 
@@ -88,6 +89,8 @@ public:
 
     virtual bool exit_module() { return true; }
 
+    // Todo virtual ~Module
+
     ModuleType get_type() const { return type; }
 
     const std::vector<Command*>& get_commands() const { return commands; }
@@ -98,6 +101,7 @@ protected:
 
 protected:
     ModuleType type;
+    // Todo raw pointer
     std::vector<Command*> commands;
 };
 

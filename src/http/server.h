@@ -22,17 +22,17 @@ public:
 
     void push_server_name(const std::string& s) { server_names.insert(s); }
 
-    bool push_location(const std::string& uri, bool regex);
+    bool push_location(Location* loc, bool regex);
 
     bool contain_server_name(const std::string& name) const;
 
-    std::shared_ptr<Location> serach(const std::string& uri);
+    Location* find_location(const std::string& uri);
 
     ModuleConf* get_conf(int index) { return confs[index].get(); }
 
 private:
     std::unordered_set<std::string> server_names;
-    std::vector<std::shared_ptr<Location>> regex_locations;
+    std::vector<std::unique_ptr<Location>> regex_locations;
     LocationTree prefix_locations;
     std::unique_ptr<ModuleConf> confs[NULL_MODULE];
 };

@@ -21,7 +21,8 @@ int MainHttpModule::location_handler(command_vals_t v) {
         return ERROR_COMMAND;
     }
 
-    if (!conf.servers.back()->push_location(v[0], false)) {
+    loc = new Location(v[0]);
+    if (!conf.servers.back()->push_location(loc, false)) {
         return ERROR_COMMAND;
     }
 
@@ -74,6 +75,25 @@ int MainHttpModule::recv_buf_handler(command_vals_t v) {
     return set_address_value(v, &TcpSocket::set_recv_buf);
 }
 
+int MainHttpModule::client_max_body_size_handler(command_vals_t v) {
+    int val = atoi(v[0].c_str());
+    if (val <= 0) {
+        return ERROR_COMMAND;
+    }
+    loc->set_client_max_body_size(val);
+
+    return NULL_BLOCK;
+}
+
+int MainHttpModule::root_handler(command_vals_t v) {
+    if (v[0].back() == '/') {
+        loc->set_root(std::string(v[0].begin(), v[0].end() - 1));
+    } else {
+        loc->set_root(v[0]);
+    }
+    return NULL_BLOCK;
+}
+
 bool MainHttpModule::http_post_handler() {
     conf.servers.shrink_to_fit();
     return true;
@@ -102,6 +122,11 @@ bool MainHttpModule::address_post_handler() {
     }
 
     return hs->push_server(conf.servers.back().get(), default_server);
+}
+
+bool MainHttpModule::location_post_handler() {
+    loc = nullptr;
+    return true;
 }
 
 inline int MainHttpModule::set_address_value(command_vals_t v,

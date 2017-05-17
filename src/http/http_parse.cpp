@@ -4,8 +4,6 @@
 #define LF      '\n'
 #define CRLF    "\r\n"
 
-#include "logger.h"
-
 #define LOWER_CASE(ch) (ch | 0x20)
 
 namespace servx {

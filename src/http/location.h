@@ -24,10 +24,19 @@ public:
 
     ModuleConf* get_conf(int index) { return confs[index].get(); }
 
+    uint32_t get_client_max_body_size() const { return client_max_body_size; }
+    void set_client_max_body_size(uint32_t n) { client_max_body_size = n; }
+
+    const std::string& get_root() const { return root; }
+    void set_root(const std::string& s) { root = s; }
+    void set_root(std::string&& s) { root = std::move(s); }
+
 private:
     bool regex;
+    std::string root;
     std::string uri;
     std::unique_ptr<ModuleConf> confs[NULL_MODULE];
+    uint32_t client_max_body_size;
 };
 
 class LocationTree;
@@ -46,7 +55,7 @@ public:
     ~LocationTreeNode() = default;
 
 private:
-    std::shared_ptr<Location> loc;
+    std::unique_ptr<Location> loc;
     std::unordered_map<char, std::unique_ptr<LocationTreeNode>> child;
 };
 
@@ -62,9 +71,9 @@ public:
 
     ~LocationTree() = default;
 
-    bool push(const std::string& uri);
+    bool push(Location* loc);
 
-    std::shared_ptr<Location> search(const std::string& uri);
+    Location* find(const std::string& uri);
 
 private:
     std::unique_ptr<LocationTreeNode> root;

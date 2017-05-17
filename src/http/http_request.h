@@ -3,18 +3,19 @@
 
 #include <unordered_map>
 
+#include "http_phase.h"
 #include "server.h"
 
 namespace servx {
 
 enum HttpMethod {
-    METHOD_UNKONWN,
-    METHOD_GET,
-    METHOD_HEAD,
-    METHOD_POST,
-    METHOD_PUT,
-    METHOD_DELETE,
-    METHOD_OPTIONS
+    HTTP_METHOD_UNKONWN,
+    HTTP_METHOD_GET,
+    HTTP_METHOD_HEAD,
+    HTTP_METHOD_POST,
+    HTTP_METHOD_PUT,
+    HTTP_METHOD_DELETE,
+    HTTP_METHOD_OPTIONS
 };
 
 enum HttpStateCode {
@@ -44,6 +45,7 @@ enum HttpStateCode {
 };
 
 class HttpRequest;
+class HttpPhaseHandler;
 
 using http_req_handler_t = std::function<void(HttpRequest*)>;
 
@@ -94,6 +96,9 @@ public:
     Server* get_server() const { return server; }
     void set_server(Server* srv) { server = srv; }
 
+    Location* get_location() const { return location; }
+    void set_location(Location* loc) { location = loc; }
+
     bool is_quoted() const { return quoted; }
     void set_quoted(bool q) { quoted = q; }
 
@@ -113,6 +118,13 @@ public:
 
     std::string get_headers_in(const char* s) const;
 
+    size_t get_phase_handler() const { return phase_handler; }
+    void set_phase_handler(size_t index) { phase_handler = index; }
+    void next_phase_handler() { ++phase_handler; }
+
+    void get_content_handler(HttpPhaseHandler* h) { content_handler = h; }
+    HttpPhaseHandler* get_content_handler() const { return content_handler; }
+
     void finalize(int state) {}
     void close(int state) {}
 
@@ -128,7 +140,11 @@ private:
     std::unordered_map<std::string, std::string> headers_in;
     std::unordered_map<std::string, std::string> headers_out;
 
+    size_t phase_handler;
+    HttpPhaseHandler *content_handler;
+
     Server *server;
+    Location *location;
 
     uint32_t quoted:1;
     uint32_t chunked:1;

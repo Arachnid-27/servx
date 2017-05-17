@@ -16,19 +16,19 @@ Server::Server() {
     }
 }
 
-bool Server::push_location(const std::string& uri, bool regex) {
+bool Server::push_location(Location* loc, bool regex) {
     if (regex) {
-        regex_locations.emplace_back(std::make_shared<Location>(uri));
+        regex_locations.emplace_back(loc);
         return true;
     }
 
-    return prefix_locations.push(uri);
+    return prefix_locations.push(loc);
 }
 
-std::shared_ptr<Location> Server::serach(const std::string& uri) {
+Location* Server::find_location(const std::string& uri) {
     // Todo regex_locations
 
-    return prefix_locations.search(uri);
+    return prefix_locations.find(uri);
 }
 
 bool HttpServers::push_server(Server* srv, bool def) {

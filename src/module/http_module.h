@@ -9,7 +9,7 @@ namespace servx {
 
 class HttpModule: public Module {
 public:
-    virtual ModuleConf* create_main_conf() { return nullptr; }
+    virtual bool post_configuration() { return true; }
 
     virtual ModuleConf* create_srv_conf() { return nullptr; }
 
@@ -27,22 +27,22 @@ public:
     using srv_conf_t = Srv;
     using loc_conf_t = Loc;
 
-    enum { index = Index };
-
 protected:
     HttpModuleWithConf(const std::initializer_list<Command*>& v)
-        : HttpModule(v) {}
+        : ModuleWithConf<HttpModule, Main, Index>(v) {}
 };
 
 struct MainHttpConf {
     std::vector<std::unique_ptr<Server>> servers;
 };
 
-class MainHttpModule: public ModuleWithConf<HttpModule,
-                                            MainHttpConf,
-                                            MAIN_HTTP_MODULE> {
+class MainHttpModule
+    : public HttpModuleWithConf<MainHttpConf,
+                                void,
+                                void,
+                                MAIN_HTTP_MODULE> {
 public:
-    MainHttpModule(): ModuleWithConf(
+    MainHttpModule(): HttpModuleWithConf(
         {
             new Command(CORE_BLOCK,
                         "http",
@@ -77,7 +77,13 @@ public:
             new Command(ADDRESS_BLOCK,
                         "recv_buf",
                         lambda_handler(recv_buf_handler), 1),
-        }) {}
+            new Command(LOCATION_BLOCK,
+                        "client_max_body_size",
+                        lambda_handler(client_max_body_size_handler), 1),
+            new Command(LOCATION_BLOCK,
+                        "root",
+                        lambda_handler(root_handler), 1)
+        }), loc(nullptr) {}
 
     int http_handler(command_vals_t v);
 
@@ -99,11 +105,17 @@ public:
 
     int recv_buf_handler(command_vals_t v);
 
+    int client_max_body_size_handler(command_vals_t v);
+
+    int root_handler(command_vals_t v);
+
     bool http_post_handler();
 
     bool server_post_handler();
 
     bool address_post_handler();
+
+    bool location_post_handler();
 
 private:
     using tcp_socket_setter = void (TcpSocket::*)(int);
@@ -115,6 +127,7 @@ private:
     std::shared_ptr<TcpSocket> tcp_socket;
     std::string addr;
     std::string port;
+    Location *loc;
     bool default_server;
 };
 

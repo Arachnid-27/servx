@@ -4,7 +4,8 @@
 
 namespace servx {
 
-Location::Location(const std::string& s): uri(s) {
+Location::Location(const std::string& s)
+    : uri(s), client_max_body_size(1024) {
     auto manager = HttpModuleManager::instance();
     for (int i = 0; i < NULL_MODULE; ++i) {
         auto module = manager->get_module(i);
@@ -14,7 +15,9 @@ Location::Location(const std::string& s): uri(s) {
     }
 }
 
-bool LocationTree::push(const std::string& uri) {
+bool LocationTree::push(Location* loc) {
+    auto &uri = loc->get_uri();
+
     if (uri[0] != '/') {
         return false;
     }
@@ -36,16 +39,16 @@ bool LocationTree::push(const std::string& uri) {
         return false;
     }
 
-    node->loc = std::make_shared<Location>(uri);
+    node->loc = std::unique_ptr<Location>(new Location(uri));
     return true;
 }
 
-std::shared_ptr<Location> LocationTree::search(const std::string& uri) {
+Location* LocationTree::find(const std::string& uri) {
     if (uri[0] != '/') {
         return nullptr;
     }
 
-    std::shared_ptr<Location> result = nullptr;
+    Location* result = nullptr;
     LocationTreeNode* node = root.get();
     decltype(node->child.find(0)) it;
 
@@ -55,7 +58,7 @@ std::shared_ptr<Location> LocationTree::search(const std::string& uri) {
             break;
         }
         if (it->second->loc != nullptr) {
-            result = it->second->loc;
+            result = it->second->loc.get();
         }
         node = (it->second).get();
     }
