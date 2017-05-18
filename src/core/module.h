@@ -1,11 +1,13 @@
 #ifndef _MODULE_H_
 #define _MODULE_H_
 
-#include <string>
-#include <vector>
+#include <algorithm>
 #include <functional>
-#include <unordered_map>
 #include <initializer_list>
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 #define ERROR_COMMAND -1
 
@@ -16,15 +18,6 @@
         [this]() { return this-handler(); }
 
 namespace servx {
-
-enum ModuleIndex {
-    MAIN_CORE_MODULE,
-    MAIN_EVENT_MODULE,
-    EPOLL_MODULE,
-    MAIN_HTTP_MODULE,
-    HTTP_STATIC_MODULE,
-    NULL_MODULE
-};
 
 enum ModuleType {
     CORE_MODULE,
@@ -70,7 +63,6 @@ public:
 
 private:
     CommandBlock block;
-    ModuleType type;
     std::string name;
     command_handler_t handler;
     int args;
@@ -89,21 +81,30 @@ public:
 
     virtual bool exit_module() { return true; }
 
-    // Todo virtual ~Module
+    virtual ~Module() = default;
 
     ModuleType get_type() const { return type; }
 
-    const std::vector<Command*>& get_commands() const { return commands; }
+    std::vector<Command*> get_commands() const;
 
 protected:
-    Module(ModuleType mt, const std::initializer_list<Command*>& v)
-        : type(mt), commands(v) {}
+    Module(ModuleType mt, const std::initializer_list<Command*>& v): type(mt) {
+        std::for_each(v.begin(), v.end(),
+            [this](Command* c) { commands.emplace_back(c); });
+        commands.shrink_to_fit();
+    }
 
 protected:
     ModuleType type;
-    // Todo raw pointer
-    std::vector<Command*> commands;
+    std::vector<std::unique_ptr<Command>> commands;
 };
+
+inline std::vector<Command*> Module::get_commands() const {
+    std::vector<Command*> vec;
+    std::for_each(commands.begin(), commands.end(),
+        [&](const std::unique_ptr<Command>& c) { vec.push_back(c.get()); });
+    return vec;
+}
 
 class ModuleConf {};
 

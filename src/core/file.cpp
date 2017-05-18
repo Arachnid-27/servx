@@ -8,12 +8,22 @@ File::~File() {
     }
 }
 
-inline bool operator==(const File& lhs, const File& rhs) {
-    return lhs.get_pathname() == rhs.get_pathname();
-}
+bool File::file_status() {
+    if (info != nullptr) {
+        return true;
+    }
 
-inline bool operator!=(const File& lhs, const File& rhs) {
-    return !(lhs == rhs);
+    if (fd == -1) {
+        return false;
+    }
+
+    struct stat *st = new struct stat;
+    if (fstat(fd, st) == -1) {
+        return false;
+    }
+
+    info = std::unique_ptr<struct stat>(st);
+    return true;
 }
 
 }

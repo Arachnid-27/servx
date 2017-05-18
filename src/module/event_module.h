@@ -4,6 +4,7 @@
 #include "connection.h"
 #include "core_module.h"
 #include "module_manager.h"
+#include "modules.h"
 
 namespace servx {
 

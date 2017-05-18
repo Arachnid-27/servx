@@ -68,35 +68,35 @@ void http_parse_method(HttpRequest* req, const char* p1, const char *p2) {
     case 3:
     case 4:
         if (compare_method_4(p1, "GET ")) {
-            req->set_method(METHOD_GET);
+            req->set_method(HTTP_METHOD_GET);
             break;
         }
 
         if (compare_method_4(p1, "HEAD")) {
-            req->set_method(METHOD_HEAD);
+            req->set_method(HTTP_METHOD_HEAD);
             break;
         }
 
         if (compare_method_4(p1, "POST")) {
-            req->set_method(METHOD_POST);
+            req->set_method(HTTP_METHOD_POST);
             break;
         }
 
         if (compare_method_4(p1, "PUT ")) {
-            req->set_method(METHOD_PUT);
+            req->set_method(HTTP_METHOD_PUT);
             break;
         }
 
         break;
     case 6:
         if (compare_method_6(p1, "DELETE")) {
-            req->set_method(METHOD_DELETE);
+            req->set_method(HTTP_METHOD_DELETE);
         }
 
         break;
     case 7:
         if (compare_method_8(p1, "OPTIONS ")) {
-            req->set_method(METHOD_OPTIONS);
+            req->set_method(HTTP_METHOD_OPTIONS);
         }
 
         break;
@@ -539,7 +539,7 @@ int http_parse_request_headers(HttpRequest* req) {
         case PARSE_HEADERS_NAME:
             switch (ch) {
             case ':':
-                req->set_headers_in_name(std::string(start, p));
+                req->set_headers_name(std::string(start, p));
                 start = p + 1;
                 state = PARSE_HEADERS_COLON;
                 break;
@@ -571,17 +571,17 @@ int http_parse_request_headers(HttpRequest* req) {
         case PARSE_HEADERS_VALUE:
             switch (ch) {
             case ' ':
-                req->set_headers_in_value(std::string(start, p));
+                req->set_headers_value(std::string(start, p));
                 start = p + 1;
                 state = PARSE_LAST_CR;
                 break;
             case CR:
-                req->set_headers_in_value(std::string(start, p));
+                req->set_headers_value(std::string(start, p));
                 start = p + 1;
                 state = PARSE_LAST_CR_LF;
                 break;
             case LF:
-                req->set_headers_in_value(std::string(start, p));
+                req->set_headers_value(std::string(start, p));
                 start = p + 1;
                 state = PARSE_LAST_CR_LF_CR;
                 break;

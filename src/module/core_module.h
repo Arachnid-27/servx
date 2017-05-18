@@ -2,6 +2,7 @@
 #define _CORE_MODULE_
 
 #include "module.h"
+#include "modules.h"
 
 namespace servx {
 

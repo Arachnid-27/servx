@@ -11,20 +11,107 @@
 
 namespace servx {
 
-HttpRequest::HttpRequest(Buffer* buf)
-    : http_method(METHOD_UNKONWN), parse_state(0),
-      buf_offset(0), content_length(-1),
-      recv_buf(buf), phase_handler(0),
-      content_handler(nullptr), server(nullptr),
+HttpRequest::HttpRequest(Connection* c)
+    : conn(c), http_method(HTTP_METHOD_UNKONWN), parse_state(0),
+      buf_offset(0), content_length(-1), response(new HttpResponse()),
+      phase_handler(0), content_handler(nullptr), server(nullptr),
       quoted(false), chunked(false), keep_alive(false) {
 }
 
-std::string HttpRequest::get_headers_in(const char* s) const {
-    auto iter = headers_in.find(std::string(s));
-    if (iter == headers_in.end()) {
+std::string HttpRequest::get_headers(const char* s) const {
+    auto iter = headers.find(std::string(s));
+    if (iter == headers.end()) {
         return std::string("");
     }
     return iter->second;
+}
+
+bool HttpRequest::discard_request_body() {
+    if (discard_body) {
+        return true;
+    }
+
+    if (!test_expect()) {
+        return false;
+    }
+
+    // Todo recv data && set event handler
+
+    discard_body = 1;
+
+    return true;
+}
+
+bool HttpRequest::test_expect() {
+    if (expect_tested) {
+        return true;
+    }
+
+    auto expect = headers.find("expect");
+    if (expect == headers.end()) {
+        return true;
+    }
+
+    expect_tested = 1;
+
+    if (expect->second != "100-continue") {
+        return true;
+    }
+
+    static char response[] = "HTTP/1.1 100 Continue\r\n\r\n";
+    if (send(conn, response, sizeof(response) - 1) == IO_SUCCESS) {
+        return true;
+    }
+
+    // connection error
+
+    return false;
+}
+
+int HttpRequest::read_request_header() {
+    Event *ev = conn->get_read_event();
+    int rc = IO_BLOCK;
+
+    if (ev->is_ready()) {
+        while (true) {
+            rc = recv(conn);
+
+            if (rc == IO_BUF_TOO_SMALL) {
+                if (get_recv_buf()->get_size() == 8192) {
+                    Logger::instance()->info("request too large");
+                    finalize(HTTP_BAD_REQUEST);
+                } else {
+                    get_recv_buf()->enlarge(8192);
+                    continue;
+                }
+            }
+
+            if (rc == IO_BLOCK) {
+                break;
+            }
+
+            if (rc == IO_FINISH || rc == IO_ERROR) {
+                if (rc == IO_FINISH) {
+                    Logger::instance()->info("client prematurely closed connection");
+                }
+                finalize(HTTP_BAD_REQUEST);
+            }
+
+            return rc;
+        }
+
+    }
+
+    Timer::instance()->add_timer(ev, 60000);
+
+    if (!ev->is_active()) {
+        if (!add_event(ev, 0)) {
+            close(HTTP_INTERNAL_SERVER_ERROR);
+            return IO_ERROR;
+        }
+    }
+
+    return rc;
 }
 
 void http_request_handler(Event* ev) {
@@ -44,7 +131,7 @@ void http_wait_request_handler(Event* ev) {
 
     Logger::instance()->debug("recv data...");
 
-    int rc = recv(conn, conn->get_recv_buf());
+    int rc = recv(conn);
 
     Logger::instance()->debug("recv return, get %d", rc);
 
@@ -78,7 +165,7 @@ void http_wait_request_handler(Event* ev) {
 
     ConnectionPool::instance()->disable_reusable(conn);
 
-    HttpRequest *req = new HttpRequest(conn->relase_recv_buf());
+    HttpRequest *req = new HttpRequest(conn);
     // req->set_read_handler(http_block_reading);
 
     HttpConnection *hc = conn->get_context<HttpConnection>();
@@ -89,51 +176,6 @@ void http_wait_request_handler(Event* ev) {
     // prepare to process request line
     ev->set_handler(http_process_request_line);
     ev->handle();
-}
-
-int http_read_request_header(Event* ev, HttpRequest* req) {
-    int rc = IO_BLOCK;
-
-    if (ev->is_ready()) {
-        while (true) {
-            rc = recv(ev->get_connection(), req->get_recv_buf());
-
-            if (rc == IO_BUF_TOO_SMALL) {
-                if (req->get_recv_buf()->get_size() == 8192) {
-                    Logger::instance()->info("request too large");
-                    req->finalize(HTTP_BAD_REQUEST);
-                } else {
-                    req->get_recv_buf()->enlarge(8192);
-                    continue;
-                }
-            }
-
-            if (rc == IO_BLOCK) {
-                break;
-            }
-
-            if (rc == IO_FINISH || rc == IO_ERROR) {
-                if (rc == IO_FINISH) {
-                    Logger::instance()->info("client prematurely closed connection");
-                }
-                req->finalize(HTTP_BAD_REQUEST);
-            }
-
-            return rc;
-        }
-
-    }
-
-    Timer::instance()->add_timer(ev, 60000);
-
-    if (!ev->is_active()) {
-        if (!add_event(ev, 0)) {
-            req->close(HTTP_INTERNAL_SERVER_ERROR);
-            return IO_ERROR;
-        }
-    }
-
-    return rc;
 }
 
 void http_process_request_headers(Event* ev) {
@@ -152,8 +194,7 @@ void http_process_request_headers(Event* ev) {
 
     while (true) {
         if (buf->get_pos() + req->get_buf_offset() == buf->get_last()) {
-            rc = http_read_request_header(ev, req);
-
+            rc = req->read_request_header();
             if (rc != IO_SUCCESS) {
                 return;
             }
@@ -166,7 +207,7 @@ void http_process_request_headers(Event* ev) {
         if (rc == PARSE_SUCCESS) {
             Logger::instance()->debug("parsing header success");
 
-            auto host = req->get_headers_in("host");
+            auto host = req->get_headers("host");
             if (host.empty()) {
                 Logger::instance()->error("can not find host");
                 req->finalize(HTTP_BAD_REQUEST);
@@ -181,9 +222,9 @@ void http_process_request_headers(Event* ev) {
                 }
             }
 
-            auto length = req->get_headers_in("content-length");
+            auto length = req->get_headers("content-length");
             if (!length.empty()) {
-                int n = atoi(length.c_str());
+                long n = atol(length.c_str());
                 if (n == 0 && length != "0") {
                     req->finalize(HTTP_BAD_REQUEST);
                     return;
@@ -191,7 +232,7 @@ void http_process_request_headers(Event* ev) {
                 req->set_content_length(n);
             }
 
-            auto encoding = req->get_headers_in("transfer-encoding");
+            auto encoding = req->get_headers("transfer-encoding");
             if (encoding == "chunked") {
                 req->set_chunked(true);
             } else if (!encoding.empty() && encoding != "identity") {
@@ -201,7 +242,7 @@ void http_process_request_headers(Event* ev) {
                 return;
             }
 
-            auto connection = req->get_headers_in("connection");
+            auto connection = req->get_headers("connection");
             if (connection == "keep-alive") {
                 Logger::instance()->debug("connection keep-alive");
                 req->set_keep_alive(true);
@@ -245,8 +286,7 @@ void http_process_request_line(Event* ev) {
 
     while (true) {
         if (buf->get_pos() + req->get_buf_offset() == buf->get_last()) {
-            rc = http_read_request_header(ev, req);
-
+            rc = req->read_request_header();
             if (rc != IO_SUCCESS) {
                 return;
             }

@@ -4,6 +4,7 @@
 #include "epoll_module.h"
 #include "event_module.h"
 #include "http_module.h"
+#include "http_static_module.h"
 
 namespace servx {
 
@@ -14,6 +15,7 @@ ModuleManager::ModuleManager() {
     create_module(MainEventModule::index, new MainEventModule);
     create_module(MainHttpModule::index, new MainHttpModule);
     create_module(EpollModule::index, new EpollModule);
+    create_module(HttpStaticModule::index, new HttpStaticModule);
 }
 
 void ModuleManager::create_module(int index, Module* module) {

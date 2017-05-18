@@ -3,6 +3,7 @@
 
 #include "core_module.h"
 #include "inet.h"
+#include "modules.h"
 #include "server.h"
 
 namespace servx {

@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include "module.h"
+#include "modules.h"
 
 namespace servx {
 

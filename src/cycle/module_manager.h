@@ -2,6 +2,7 @@
 #define _MODULE_MANAGER_
 
 #include "http_module.h"
+#include "modules.h"
 
 namespace servx {
 
@@ -25,7 +26,6 @@ private:
 
     void create_module(int index, Module* module);
 
-private:
     Module* modules[NULL_MODULE];
     std::unordered_map<std::string, Command*> commands;
 

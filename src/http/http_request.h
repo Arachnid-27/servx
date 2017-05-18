@@ -3,7 +3,9 @@
 
 #include <unordered_map>
 
+#include "connection.h"
 #include "http_phase.h"
+#include "http_response.h"
 #include "server.h"
 
 namespace servx {
@@ -18,32 +20,6 @@ enum HttpMethod {
     HTTP_METHOD_OPTIONS
 };
 
-enum HttpStateCode {
-    HTTP_CONTINUE = 100,
-
-    HTTP_OK = 200,
-
-    HTTP_MOVED_PERMANENTLY = 301,
-    HTTP_MOVED_TEMPORARILY = 301,
-
-    HTTP_BAD_REQUEST = 400,
-    HTTP_UNAUTHORIZED = 401,
-    HTTP_FORBIDDEN = 403,
-    HTTP_NOT_FOUND = 404,
-    HTTP_NOT_ALLOWED = 405,
-    HTTP_REQUEST_TIME_OUT = 408,
-    HTTP_CONFLICT = 409,
-    HTTP_LENGTH_REQUIRED = 411,
-    HTTP_PRECONDITION_FAILED = 412,
-    HTTP_REQUEST_ENTITY_TOO_LARGE = 413,
-    HTTP_REQUEST_URI_TOO_LARGE = 414,
-
-    HTTP_INTERNAL_SERVER_ERROR = 500,
-    HTTP_NOT_IMPLEMENTED = 501,
-    HTTP_BAD_GATEWAY = 502,
-    HTTP_SERVICE_UNAVAILABLE = 503
-};
-
 class HttpRequest;
 class HttpPhaseHandler;
 
@@ -51,7 +27,7 @@ using http_req_handler_t = std::function<void(HttpRequest*)>;
 
 class HttpRequest {
 public:
-    HttpRequest(Buffer* buf);
+    HttpRequest(Connection* c);
 
     HttpRequest(const HttpRequest&) = delete;
     HttpRequest(HttpRequest&&) = delete;
@@ -88,7 +64,7 @@ public:
     int get_parse_state() const { return parse_state; }
     void set_parse_state(int state) { parse_state = state; }
 
-    Buffer* get_recv_buf() const { return recv_buf.get(); }
+    Buffer* get_recv_buf() const { return conn->get_recv_buf(); }
 
     int get_buf_offset() const { return buf_offset; }
     void set_buf_offset(int n) { buf_offset = n; }
@@ -108,15 +84,15 @@ public:
     bool is_keep_alive() const { return keep_alive; }
     void set_keep_alive(bool k) { keep_alive = k; }
 
-    int get_content_length() const { return content_length; }
-    void set_content_length(int n) { content_length = n; }
+    long get_content_length() const { return content_length; }
+    void set_content_length(long n) { content_length = n; }
 
     bool is_lingering_close() const { return content_length > 0 || chunked; }
 
-    void set_headers_in_name(std::string&& s) { name = std::move(s); }
-    void set_headers_in_value(std::string&& s);
+    void set_headers_name(std::string&& s) { name = std::move(s); }
+    void set_headers_value(std::string&& s);
 
-    std::string get_headers_in(const char* s) const;
+    std::string get_headers(const char* s) const;
 
     size_t get_phase_handler() const { return phase_handler; }
     void set_phase_handler(size_t index) { phase_handler = index; }
@@ -125,20 +101,31 @@ public:
     void get_content_handler(HttpPhaseHandler* h) { content_handler = h; }
     HttpPhaseHandler* get_content_handler() const { return content_handler; }
 
-    void finalize(int state) {}
-    void close(int state) {}
+    bool is_discard_body() const { return discard_body; }
+    bool discard_request_body();
+
+    bool is_expect_tested() const { return expect_tested; }
+    bool test_expect();
+
+    HttpResponse* get_response() const { return response.get(); }
+
+    int read_request_header();
+
+    void finalize(int status) {}
+    void close(int status) {}
 
 private:
+    Connection *conn;
     HttpMethod http_method;
     int parse_state;
     int buf_offset;
-    int content_length;
+    long content_length;
     // void** ctx;
     http_req_handler_t read_handler;
     http_req_handler_t write_handler;
-    std::unique_ptr<Buffer> recv_buf;
-    std::unordered_map<std::string, std::string> headers_in;
-    std::unordered_map<std::string, std::string> headers_out;
+    std::unordered_map<std::string, std::string> headers;
+
+    std::unique_ptr<HttpResponse> response;
 
     size_t phase_handler;
     HttpPhaseHandler *content_handler;
@@ -149,6 +136,8 @@ private:
     uint32_t quoted:1;
     uint32_t chunked:1;
     uint32_t keep_alive:1;
+    uint32_t discard_body:1;
+    uint32_t expect_tested:1;
 
     std::string name;
 
@@ -161,8 +150,8 @@ private:
     std::string version;
 };
 
-inline void HttpRequest::set_headers_in_value(std::string&& s) {
-    headers_in.emplace(std::move(name), std::move(s));
+inline void HttpRequest::set_headers_value(std::string&& s) {
+    headers.emplace(std::move(name), std::move(s));
 }
 
 class HttpConnection: public ConnectionContext {
