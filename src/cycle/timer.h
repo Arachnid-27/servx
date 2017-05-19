@@ -1,7 +1,6 @@
 #ifndef _TIMER_H_
 #define _TIMER_H_
 
-#include <ctime>
 #include <set>
 
 #include "connection.h"
@@ -24,7 +23,7 @@ public:
 
     ~Timer() = default;
 
-    void add_timer(Event* ev, std::time_t delay);
+    void add_timer(Event* ev, uint32_t delay);
 
     void del_timer(Event* ev);
 

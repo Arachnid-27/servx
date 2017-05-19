@@ -56,10 +56,7 @@ int HttpStaticModule::http_static_handler(HttpRequest* req) {
     resp->set_status(HTTP_OK);
     resp->set_content_length(file.get_file_size());
     resp->set_last_modified_time(file.get_modify_time());
-
-    if (!resp->set_etag()) {
-        return HTTP_INTERNAL_SERVER_ERROR;
-    }
+    resp->set_etag(true);
 
     // Todo set content_type
 

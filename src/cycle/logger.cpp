@@ -9,10 +9,10 @@ namespace servx {
 Logger* Logger::logger = new Logger;
 
 void Logger::log(const char* level, const char* fmt, va_list args) {
-    time_t ms = Clock::instance()->get_current_ms();
+    char buf[1024];
+    const char* time = Clock::instance()->get_current_log_time().c_str();
 
-    // Todo use format time
-    int sz = snprintf(buf, 1024, "[%s] #%d# %ld : ", level, pid, ms);
+    int sz = snprintf(buf, 1024, "[%s] #%d# %s : ", level, pid, time);
 
     sz += vsnprintf(buf + sz, 1024 - sz, fmt, args);
 

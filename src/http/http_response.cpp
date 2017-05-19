@@ -1,55 +1,45 @@
 #include "http_response.h"
 
 #include <cstdio>
+#include <sys/time.h>
 
+#include "clock.h"
 #include "http_request.h"
+#include "logger.h"
 
 namespace servx {
 
 std::unordered_map<int, std::string> HttpResponse::status_lines = {
-    { HTTP_CONTINUE, "100 Continue\r\n" },
+    { HTTP_CONTINUE, "Continue" },
 
-    { HTTP_OK, "200 OK\r\n" },
-    { HTTP_PARTIAL_CONTENT, "206 Partial Content\r\n" },
+    { HTTP_OK, "OK" },
+    { HTTP_PARTIAL_CONTENT, "Partial Content" },
 
-    { HTTP_MOVED_PERMANENTLY, "301 Moved Permanently\r\n" },
-    { HTTP_MOVED_TEMPORARILY, "302 Moved Temporarily\r\n" },
-    { HTTP_NOT_MODIFIED, "304 Not Modified\r\n" },
+    { HTTP_MOVED_PERMANENTLY, "Moved Permanently" },
+    { HTTP_MOVED_TEMPORARILY, "Moved Temporarily" },
+    { HTTP_NOT_MODIFIED, "Not Modified" },
 
-    { HTTP_BAD_REQUEST, "400 Bad Request\r\n" },
-    { HTTP_UNAUTHORIZED, "401 Unauthorized\r\n" },
-    { HTTP_FORBIDDEN, "403 Forbidden\r\n" },
-    { HTTP_NOT_FOUND, "404 Not Found\r\n" },
-    { HTTP_NOT_ALLOWED, "405 Not Allowed\r\n" },
-    { HTTP_REQUEST_TIME_OUT, "408 Request Time-out\r\n" },
-    { HTTP_CONFLICT, "409 Conflict\r\n" },
-    { HTTP_LENGTH_REQUIRED, "411 Length Required\r\n" },
-    { HTTP_PRECONDITION_FAILED, "412 Precondition Failed\r\n" },
-    { HTTP_REQUEST_ENTITY_TOO_LARGE, "413 Request Entity Too Large\r\n" },
-    { HTTP_REQUEST_URI_TOO_LARGE, "413 Request-URI Too Large\r\n" },
+    { HTTP_BAD_REQUEST, "Bad Request" },
+    { HTTP_UNAUTHORIZED, "Unauthorized" },
+    { HTTP_FORBIDDEN, "Forbidden" },
+    { HTTP_NOT_FOUND, "Not Found" },
+    { HTTP_NOT_ALLOWED, "Not Allowed" },
+    { HTTP_REQUEST_TIME_OUT, "Request Time-out" },
+    { HTTP_CONFLICT, "Conflict" },
+    { HTTP_LENGTH_REQUIRED, "Length Required" },
+    { HTTP_PRECONDITION_FAILED, "Precondition Failed" },
+    { HTTP_REQUEST_ENTITY_TOO_LARGE, "Request Entity Too Large" },
+    { HTTP_REQUEST_URI_TOO_LARGE, "Request-URI Too Large" },
 
-    { HTTP_INTERNAL_SERVER_ERROR, "500 Internal Server Error\r\n" },
-    { HTTP_NOT_IMPLEMENTED, "501 Not Implemented\r\n" },
-    { HTTP_BAD_GATEWAY, "502 Bad Gateway\r\n" },
-    { HTTP_SERVICE_UNAVAILABLE, "503 Service Temporarily Unavailable\r\n" },
-    { HTTP_GATEWAY_TIME_OUT, "504 Gateway Time-out\r\n" }
+    { HTTP_INTERNAL_SERVER_ERROR, "Internal Server Error" },
+    { HTTP_NOT_IMPLEMENTED, "Not Implemented" },
+    { HTTP_BAD_GATEWAY, "Bad Gateway" },
+    { HTTP_SERVICE_UNAVAILABLE, "Service Temporarily Unavailable" },
+    { HTTP_GATEWAY_TIME_OUT, "Gateway Time-out" }
 };
 
 HttpResponse::HttpResponse()
-    : send_buf(new Buffer(4096)), last_modified_time(-1),
-      content_length(-1), status(-1) {
-}
-
-bool HttpResponse::set_etag() {
-    if (last_modified_time == -1 || content_length == -1) {
-        return false;
-    }
-
-    char buf[128];
-    sprintf(buf, "\"%lx-%lx\"", last_modified_time, content_length);
-    headers.emplace("ETag", buf);
-
-    return true;
+    : content_length(-1), last_modified_time(-1), status(-1) {
 }
 
 bool HttpResponse::send_header() {
@@ -63,8 +53,93 @@ bool HttpResponse::send_header() {
         last_modified_time = -1;
     }
 
-    // ...
+    if (status == HTTP_NOT_MODIFIED) {
+        header_only = 1;
+    }
 
+    out.emplace_back(4096);
+
+    int n;
+    Buffer *buf = &out.back();
+    char *pos = buf->get_pos();
+
+    n = sprintf(pos, "HTTP/1.1 %d %s\r\n",
+                status, status_lines[status].c_str());
+    pos += n;
+
+    n = sprintf(pos, "Server:servx/0.1\r\n");
+    pos += n;
+
+    n = sprintf(pos, "Date:%s\r\n",
+                Clock::instance()->get_current_http_time().c_str());
+
+    if (content_length != -1) {
+        n = sprintf(pos, "Content-Length:%ld\r\n", content_length);
+        pos += n;
+    }
+
+    if (last_modified_time != -1) {
+        n = sprintf(pos, "Last-Modified:");
+        pos += n;
+        n = Clock::format_http_time(last_modified_time, pos);
+        if (n == -1) {
+            Logger::instance()->warn("format last modified time error");
+        } else {
+            pos += n;
+        }
+        n = sprintf(pos, "\r\n");
+        pos += n;
+    }
+
+    if (etag) {
+        if (last_modified_time == -1 || content_length == -1) {
+            Logger::instance()->warn("can not set etag");
+        } else {
+            n = sprintf(pos, "Etag:\"%lx-%lx\"\r\n",
+                        last_modified_time, content_length);
+            pos += n;
+        }
+    }
+
+    if (chunked) {
+        n = sprintf(pos, "Transfer-Encoding:chunked\r\n");
+        pos += n;
+    }
+
+    if (keep_alive) {
+        n = sprintf(pos, "Connection:keep-alive\r\n");
+        pos += n;
+    } else {
+        n = sprintf(pos, "Connection:close\r\n");
+        pos += n;
+    }
+
+    buf->set_last(pos);
+
+    for (auto &s : headers) {
+        n = snprintf(pos, buf->get_remain(), "%s:%s\r\n",
+                     s.first.c_str(), s.second.c_str());
+        // buffer full means that we need alloc a new buffer
+        // but we should discard the last result (don't invoke set_last)
+        // becase we don't know if it is truncated
+        if (pos + n == buf->get_end()) {
+            out.emplace_back(4096);
+            buf = &out.back();
+            pos = buf->get_pos();
+            n = snprintf(pos, buf->get_remain(), "%s:%s\r\n",
+                         s.first.c_str(), s.second.c_str());
+            // we assume it will success
+        }
+        pos += n;
+        buf->set_last(pos);
+    }
+
+    pos[0] = '\r';
+    pos[1] = '\n';
+
+    buf->set_last(pos + 2);
+
+    // ...
     return true;
 }
 

@@ -50,7 +50,7 @@ private:
 
     void log(const char* level, const char* fmt, va_list args);
 
-private:
+    // Todo signal-safe stack buffer
     char buf[1024];
     pid_t pid;
     File std_err;

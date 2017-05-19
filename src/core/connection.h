@@ -28,9 +28,9 @@ public:
     bool is_active() const { return active == 1; }
     void set_active(bool a) { active = a; }
 
-    time_t get_timer() const { return timer; }
+    uint64_t get_timer() const { return timer; }
     bool is_timer() const { return timer != 0; }
-    void set_timer(time_t t) { timer = t; }
+    void set_timer(uint64_t t) { timer = t; }
 
     bool is_ready() const { return ready; }
     void set_ready(bool r) { ready = r; }
@@ -58,7 +58,7 @@ private:
     uint32_t timeout:1;
     uint32_t eof:1;
     uint32_t error:1;
-    time_t timer;
+    uint64_t timer;
     std::function<void(Event*)> handler;
 };
 

@@ -1,6 +1,7 @@
 #ifndef _HTTP_RESPONSE_H_
 #define _HTTP_RESPONSE_H_
 
+#include <list>
 #include <memory>
 #include <unordered_map>
 
@@ -60,16 +61,31 @@ public:
     int get_status() const { return status; }
     void set_status(int s) { status = s; }
 
+    bool is_header_only() const { return header_only; }
+    void set_header_only(bool h) { header_only = h; }
+
+    bool is_chunked() const { return chunked; }
+    void set_chunked(bool c) { chunked = c; }
+
+    bool is_keep_alive() const { return keep_alive; }
+    void set_keep_alive(bool k) { keep_alive = k; }
+
     bool send_header();
 
-    bool set_etag();
+    void set_etag(bool e) { etag = e; };
 
 private:
-    std::unique_ptr<Buffer> send_buf;
     std::unordered_map<std::string, std::string> headers;
-    long last_modified_time;
     long content_length;
+    long last_modified_time;
     int status;
+
+    uint32_t header_only:1;
+    uint32_t chunked:1;
+    uint32_t keep_alive:1;
+    uint32_t etag:1;
+
+    std::list<Buffer> out;
 
     static std::unordered_map<int, std::string> status_lines;
 };

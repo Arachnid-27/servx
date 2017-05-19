@@ -8,22 +8,38 @@ namespace servx {
 class Clock {
 public:
     Clock(const Clock&) = delete;
+    Clock(Clock&&) = delete;
+    Clock& operator=(const Clock&) = delete;
+    Clock& operator=(Clock&&) = delete;
+
+    ~Clock() = default;
 
     void update();
 
-    time_t get_current_ms() const { return current_ms; }
+    uint64_t get_current_milliseconds() const { return milliseconds[cur]; }
 
-public:
+    const std::string& get_current_http_time() const { return http_time[cur]; }
+
+    const std::string& get_current_log_time() const { return log_time[cur]; }
+
     static Clock* instance() { return clock; }
 
-private:
-    Clock() = default;
+    static int format_http_time(time_t sec, char* buf);
 
 private:
+    Clock();
+
     std::mutex mtx;
-    time_t current_ms;
 
-private:
+    std::string http_time[2];
+    std::string log_time[2];
+    uint64_t milliseconds[2];
+
+    uint8_t cur;
+
+    static const char* week[];
+    static const char* months[];
+
     static Clock* clock;
 };
 

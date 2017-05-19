@@ -246,6 +246,7 @@ void http_process_request_headers(Event* ev) {
             if (connection == "keep-alive") {
                 Logger::instance()->debug("connection keep-alive");
                 req->set_keep_alive(true);
+                req->get_response()->set_keep_alive(true);
             }
 
             if (conn->get_read_event()->is_timer()) {
