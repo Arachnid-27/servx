@@ -4,7 +4,9 @@
 #include <sys/time.h>
 
 #include "clock.h"
+#include "core.h"
 #include "http_request.h"
+#include "io.h"
 #include "logger.h"
 
 namespace servx {
@@ -38,13 +40,13 @@ std::unordered_map<int, std::string> HttpResponse::status_lines = {
     { HTTP_GATEWAY_TIME_OUT, "Gateway Time-out" }
 };
 
-HttpResponse::HttpResponse()
-    : content_length(-1), last_modified_time(-1), status(-1) {
+HttpResponse::HttpResponse(Connection* c)
+    : conn(c), content_length(-1), last_modified_time(-1), status(-1) {
 }
 
-bool HttpResponse::send_header() {
+int HttpResponse::send_header() {
     if (status == -1) {
-        return false;
+        return SERVX_ERROR;
     }
 
     if (status != HTTP_OK &&
@@ -57,7 +59,7 @@ bool HttpResponse::send_header() {
         header_only = 1;
     }
 
-    out.emplace_back(4096);
+    out.emplace_back(2048);
 
     int n;
     Buffer *buf = &out.back();
@@ -123,7 +125,7 @@ bool HttpResponse::send_header() {
         // but we should discard the last result (don't invoke set_last)
         // becase we don't know if it is truncated
         if (pos + n == buf->get_end()) {
-            out.emplace_back(4096);
+            out.emplace_back(2048);
             buf = &out.back();
             pos = buf->get_pos();
             n = snprintf(pos, buf->get_remain(), "%s:%s\r\n",
@@ -134,13 +136,33 @@ bool HttpResponse::send_header() {
         buf->set_last(pos);
     }
 
+    if (buf->get_remain() < 2) {
+        out.emplace_back(4);
+        buf = &out.back();
+        pos = buf->get_pos();
+    }
+
     pos[0] = '\r';
     pos[1] = '\n';
 
     buf->set_last(pos + 2);
 
-    // ...
-    return true;
+    int rc = io_send_chain(conn->get_fd(), out);
+
+    if (rc == SERVX_ERROR) {
+        return SERVX_ERROR;
+    }
+
+    auto iter = out.begin();
+    while (iter != out.end()) {
+        if (iter->get_size() == 0) {
+            iter = out.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+
+    return rc == SERVX_PARTIAL ? SERVX_AGAIN : SERVX_OK;
 }
 
 }

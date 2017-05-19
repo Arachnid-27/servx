@@ -1,22 +1,17 @@
 #ifndef _IO_H_
 #define _IO_H_
 
-#include "connection.h"
+#include <list>
+
+#include "buffer.h"
 
 namespace servx {
 
-enum IOResultCode {
-    IO_SUCCESS,     // read/write success
-    IO_PARTIAL,     // success but partial read/write
-    IO_FINISH,      // read EOF
-    IO_ERROR,
-    IO_BLOCK,
-    IO_BUF_TOO_SMALL
-};
+int io_recv(int fd, Buffer* buf);
 
-int recv(Connection* conn);
+int io_send(int fd, Buffer* buf);
 
-int send(Connection* conn, char* buf, uint32_t size);
+int io_send_chain(int fd, std::list<Buffer>& chain);
 
 }
 

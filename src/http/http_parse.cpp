@@ -1,5 +1,7 @@
 #include "http_parse.h"
 
+#include "core.h"
+
 #define CR      '\r'
 #define LF      '\n'
 #define CRLF    "\r\n"
@@ -126,7 +128,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_ERROR;
+            return SERVX_ERROR;
 
         case PARSE_METHOD:
             if (ch >= 'A' && ch <= 'Z') {
@@ -141,7 +143,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_ERROR;
+            return SERVX_ERROR;
 
         case PARSE_BEFORE_URI:
             if (ch == '/') {
@@ -161,7 +163,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_ERROR;
+            return SERVX_ERROR;
 
         case PARSE_ABSOLUTE_URI_SCHEMA:
             c = LOWER_CASE(ch);
@@ -176,7 +178,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_ERROR;
+            return SERVX_ERROR;
 
         case PARSE_ABSOLUTE_URI_SCHEMA_SLASH:
             if (ch == '/') {
@@ -185,7 +187,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_ERROR;
+            return SERVX_ERROR;
 
         case PARSE_ABSOLUTE_URI_SCHEMA_SLASH_2:
             if (ch == '/') {
@@ -194,7 +196,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_ERROR;
+            return SERVX_ERROR;
 
         case PARSE_ABSOLUTE_URI_HOST:   // rfc 3986 3.2.2
             if (ch == '[') {
@@ -237,7 +239,7 @@ int http_parse_request_line(HttpRequest* req) {
                 state = PARSE_VERSION_H;
                 break;
             default:
-                return PARSE_ERROR;
+                return SERVX_ERROR;
             }
 
             break;
@@ -257,7 +259,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_ERROR;
+            return SERVX_ERROR;
 
         case PARSE_ABSOLUTE_URI_PORT:
             if (ch >= '0' && ch <= '9') {
@@ -277,7 +279,7 @@ int http_parse_request_line(HttpRequest* req) {
                 state = PARSE_VERSION_H;
                 break;
             default:
-                return PARSE_ERROR;
+                return SERVX_ERROR;
             }
 
             break;
@@ -304,7 +306,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             case CR:
             case LF:
-                return PARSE_ERROR;
+                return SERVX_ERROR;
             }
 
             break;
@@ -323,7 +325,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             case CR:
             case LF:
-                return PARSE_ERROR;
+                return SERVX_ERROR;
             }
 
             break;
@@ -337,7 +339,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             case CR:
             case LF:
-                return PARSE_ERROR;
+                return SERVX_ERROR;
             }
 
             break;
@@ -352,7 +354,7 @@ int http_parse_request_line(HttpRequest* req) {
                 start = p + 1;
                 break;
             default:
-                return PARSE_ERROR;
+                return SERVX_ERROR;
             }
 
             break;
@@ -364,7 +366,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_ERROR;
+            return SERVX_ERROR;
 
         case PARSE_VERSION_HTT:
             if (ch == 'T') {
@@ -373,7 +375,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_ERROR;
+            return SERVX_ERROR;
 
         case PARSE_VERSION_HTTP:
             if (ch == 'P') {
@@ -382,7 +384,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_ERROR;
+            return SERVX_ERROR;
 
         case PARSE_VERSION_HTTP_SLASH:
             if (ch == '/') {
@@ -391,7 +393,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_ERROR;
+            return SERVX_ERROR;
 
         case PARSE_VERSION_HTTP_SLASH_NUMBER:
             if (ch >= '0' && ch <= '9') {
@@ -399,7 +401,7 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_ERROR;
+            return SERVX_ERROR;
 
         case PARSE_VERSION_HTTP_SLASH_VERSION:
             if ((ch >= '0' && ch <= '9') || ch == '.') {
@@ -422,9 +424,9 @@ int http_parse_request_line(HttpRequest* req) {
                 buf->set_pos(p + 1);
                 req->set_parse_state(PARSE_START);
                 req->set_buf_offset(0);
-                return PARSE_SUCCESS;
+                return SERVX_OK;
             default:
-                return PARSE_ERROR;
+                return SERVX_ERROR;
             }
 
             break;
@@ -442,9 +444,9 @@ int http_parse_request_line(HttpRequest* req) {
                 buf->set_pos(p + 1);
                 req->set_buf_offset(0);
                 req->set_parse_state(PARSE_START);
-                return PARSE_SUCCESS;
+                return SERVX_OK;
             default:
-                return PARSE_ERROR;
+                return SERVX_ERROR;
             }
 
             break;
@@ -454,17 +456,17 @@ int http_parse_request_line(HttpRequest* req) {
                 buf->set_pos(p + 1);
                 req->set_buf_offset(0);
                 req->set_parse_state(PARSE_START);
-                return PARSE_SUCCESS;
+                return SERVX_OK;
             }
 
-            return PARSE_ERROR;
+            return SERVX_ERROR;
         }
     }
 
     buf->set_pos(start);
     req->set_parse_state(state);
     req->set_buf_offset(last - start);
-    return PARSE_AGAIN;
+    return SERVX_AGAIN;
 }
 
 int http_parse_request_headers(HttpRequest* req) {
@@ -523,7 +525,7 @@ int http_parse_request_headers(HttpRequest* req) {
                 req->set_parse_state(PARSE_DONE);
                 req->set_buf_offset(0);
                 buf->set_pos(p + 1);
-                return PARSE_SUCCESS;
+                return SERVX_OK;
             default:
                 ch = lowercase[static_cast<uint8_t>(ch)];
                 if (ch) {
@@ -531,7 +533,7 @@ int http_parse_request_headers(HttpRequest* req) {
                     state = PARSE_HEADERS_NAME;
                     break;
                 }
-                return PARSE_ERROR;
+                return SERVX_ERROR;
             }
 
             break;
@@ -549,7 +551,7 @@ int http_parse_request_headers(HttpRequest* req) {
                     *p = ch;
                     break;
                 }
-                return PARSE_ERROR;
+                return SERVX_ERROR;
             }
 
             break;
@@ -559,7 +561,7 @@ int http_parse_request_headers(HttpRequest* req) {
             case ' ':
                 break;
             case '\0':
-                return PARSE_ERROR;
+                return SERVX_ERROR;
             default:
                 start = p;
                 state = PARSE_HEADERS_VALUE;
@@ -586,7 +588,7 @@ int http_parse_request_headers(HttpRequest* req) {
                 state = PARSE_LAST_CR_LF_CR;
                 break;
             case '\0':
-                return PARSE_ERROR;
+                return SERVX_ERROR;
             }
 
             break;
@@ -604,7 +606,7 @@ int http_parse_request_headers(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_ERROR;
+            return SERVX_ERROR;
 
         case PARSE_LAST_CR_LF:
             if (ch == LF) {
@@ -613,7 +615,7 @@ int http_parse_request_headers(HttpRequest* req) {
                 break;
             }
 
-            return PARSE_ERROR;
+            return SERVX_ERROR;
 
         case PARSE_LAST_CR_LF_CR:
             switch (ch) {
@@ -621,9 +623,9 @@ int http_parse_request_headers(HttpRequest* req) {
                 state = PARSE_LAST_CR_LF_CR_LF;
                 break;
             case LF:
-                return PARSE_SUCCESS;
+                return SERVX_OK;
             default:
-                return PARSE_ERROR;
+                return SERVX_ERROR;
             }
 
             break;
@@ -633,25 +635,25 @@ int http_parse_request_headers(HttpRequest* req) {
                 req->set_parse_state(PARSE_DONE);
                 req->set_buf_offset(0);
                 buf->set_pos(p + 1);
-                return PARSE_SUCCESS;
+                return SERVX_OK;
             }
 
-            return PARSE_ERROR;
+            return SERVX_ERROR;
         }
     }
 
     buf->set_pos(start);
     req->set_parse_state(state);
     req->set_buf_offset(last - start);
-    return PARSE_AGAIN;
+    return SERVX_AGAIN;
 }
 
 int http_parse_quoted(HttpRequest* req) {
-    return PARSE_SUCCESS;
+    return SERVX_OK;
 }
 
 int http_parse_args(HttpRequest* req) {
-    return PARSE_SUCCESS;
+    return SERVX_OK;
 }
 
 }

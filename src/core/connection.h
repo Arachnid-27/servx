@@ -98,13 +98,14 @@ public:
     template <class T>
     T* get_context() const { return static_cast<T*>(ctx.get());}
 
-    void init_recv_buf(int sz);
-
     Buffer* get_recv_buf() const { return recv_buf.get(); }
-    Buffer* relase_recv_buf() { return recv_buf.release(); }
+    void init_recv_buf(int sz);
 
     bool is_timeout() const { return timeout; }
     void set_timeout(bool t) { timeout = t; }
+
+    int recv_data();
+    int send_data(char* data, int size);
 
 private:
     uint64_t conn_id;

@@ -5,7 +5,9 @@
 #include <cstring>
 
 #include "connection_pool.h"
+#include "core.h"
 #include "event_module.h"
+#include "io.h"
 #include "logger.h"
 #include "timer.h"
 
@@ -85,6 +87,51 @@ void Connection::close() {
 
 void Connection::init_recv_buf(int sz) {
     recv_buf = std::unique_ptr<Buffer>(new Buffer(sz));
-};
+}
+
+int Connection::recv_data() {
+    int rc = io_recv(socket_fd, recv_buf.get());
+
+    switch (rc) {
+    case SERVX_OK:
+    case SERVX_DENY:
+        return rc;
+    case SERVX_DONE:
+        read_event.set_eof(true);
+        break;
+    case SERVX_ERROR:
+        read_event.set_error(true);
+        break;
+    }
+
+    read_event.set_ready(false);
+    return rc;
+}
+
+int Connection::send_data(char* data, int size) {
+    if (size < 0) {
+        return SERVX_ERROR;
+    }
+
+    Buffer buf(data, size, false);
+    int rc = io_send(socket_fd, &buf);
+
+    // Todo record bytes the conn sent
+
+    switch (rc) {
+    case SERVX_OK:
+        break;
+    case SERVX_DONE:
+        read_event.set_eof(true);
+        break;
+    case SERVX_ERROR:
+        read_event.set_error(true);
+        break;
+    }
+
+    read_event.set_ready(false);
+
+    return rc;
+}
 
 }

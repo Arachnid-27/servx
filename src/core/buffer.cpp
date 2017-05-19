@@ -4,39 +4,49 @@
 
 namespace servx {
 
-Buffer::Buffer(int sz): size(sz) {
-    start = new char[sz];
-    end = start + size;
-    reset();
-}
-
-void Buffer::reset() {
+Buffer::Buffer(uint32_t cap): deleteable(true) {
+    start = new char[cap];
+    end = start + cap;
     pos = last = start;
 }
 
-void Buffer::shrink() {
-    if (start != pos) {
-        auto offset = last - pos;
-        memmove(start, pos, offset);
+Buffer::Buffer(char* data, uint32_t size, bool del): deleteable(del) {
+    if (del) {
+        start = new char[size];
+        memcpy(start, data, size);
         pos = start;
-        last = pos + offset;
+    } else {
+        start = pos = data;
+    }
+    end = last = data + size;
+}
+
+void Buffer::shrink() {
+    if (deleteable && start != pos) {
+        uint32_t size = get_size();
+        memmove(start, pos, size);
+        pos = start;
+        last = pos + size;
     }
 }
 
-void Buffer::enlarge(int sz) {
-    if (sz > size) {
-        auto offset = last - pos;
-        char *new_start = new char[sz];
-        memcpy(new_start, pos, offset);
-        start = pos = new_start;
-        end = new_start + sz;
-        last = pos + offset;
-        size = sz;
+void Buffer::enlarge(uint32_t cap) {
+    if (deleteable && get_capacity() < cap) {
+        uint32_t size = get_size();
+        char *old = start;
+        start = new char[cap];
+        memcpy(start, pos, size);
+        pos = start;
+        end = start + cap;
+        last = pos + size;
+        delete[] old;
     }
 }
 
 Buffer::~Buffer() {
-    delete[] start;
+    if (deleteable) {
+        delete[] start;
+    }
 }
 
 };

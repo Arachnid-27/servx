@@ -5,7 +5,8 @@
 #include <memory>
 #include <unordered_map>
 
-#include "buffer.h"
+#include "connection.h"
+#include "file.h"
 
 namespace servx {
 
@@ -40,7 +41,7 @@ enum HttpStateCode {
 
 class HttpResponse {
 public:
-    HttpResponse();
+    HttpResponse(Connection* c);
 
     HttpResponse(const HttpResponse&) = delete;
     HttpResponse(HttpResponse&&) = delete;
@@ -70,12 +71,14 @@ public:
     bool is_keep_alive() const { return keep_alive; }
     void set_keep_alive(bool k) { keep_alive = k; }
 
-    bool send_header();
+    int send_header();
+    int send_body();
 
     void set_etag(bool e) { etag = e; };
 
 private:
     std::unordered_map<std::string, std::string> headers;
+    Connection *conn;
     long content_length;
     long last_modified_time;
     int status;
@@ -85,6 +88,7 @@ private:
     uint32_t keep_alive:1;
     uint32_t etag:1;
 
+    std::unique_ptr<File> file;
     std::list<Buffer> out;
 
     static std::unordered_map<int, std::string> status_lines;

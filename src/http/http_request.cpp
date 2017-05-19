@@ -3,6 +3,7 @@
 #include <cstdlib>
 
 #include "connection_pool.h"
+#include "core.h"
 #include "event_module.h"
 #include "http_parse.h"
 #include "io.h"
@@ -13,7 +14,7 @@ namespace servx {
 
 HttpRequest::HttpRequest(Connection* c)
     : conn(c), http_method(HTTP_METHOD_UNKONWN), parse_state(0),
-      buf_offset(0), content_length(-1), response(new HttpResponse()),
+      buf_offset(0), content_length(-1), response(new HttpResponse(c)),
       phase_handler(0), content_handler(nullptr), server(nullptr),
       quoted(false), chunked(false), keep_alive(false) {
 }
@@ -59,7 +60,7 @@ bool HttpRequest::test_expect() {
     }
 
     static char response[] = "HTTP/1.1 100 Continue\r\n\r\n";
-    if (send(conn, response, sizeof(response) - 1) == IO_SUCCESS) {
+    if (conn->send_data(response, sizeof(response) - 1) == SERVX_OK) {
         return true;
     }
 
@@ -70,13 +71,13 @@ bool HttpRequest::test_expect() {
 
 int HttpRequest::read_request_header() {
     Event *ev = conn->get_read_event();
-    int rc = IO_BLOCK;
+    int rc = SERVX_NOT_READY;
 
     if (ev->is_ready()) {
         while (true) {
-            rc = recv(conn);
+            rc = conn->recv_data();
 
-            if (rc == IO_BUF_TOO_SMALL) {
+            if (rc == SERVX_DENY) {
                 if (get_recv_buf()->get_size() == 8192) {
                     Logger::instance()->info("request too large");
                     finalize(HTTP_BAD_REQUEST);
@@ -86,28 +87,31 @@ int HttpRequest::read_request_header() {
                 }
             }
 
-            if (rc == IO_BLOCK) {
+            if (rc == SERVX_NOT_READY) {
                 break;
             }
 
-            if (rc == IO_FINISH || rc == IO_ERROR) {
-                if (rc == IO_FINISH) {
-                    Logger::instance()->info("client prematurely closed connection");
-                }
+            if (rc == SERVX_DONE) {
+                Logger::instance()->info("client prematurely closed connection");
+                finalize(HTTP_BAD_REQUEST);
+            }
+
+            if (rc == SERVX_ERROR) {
                 finalize(HTTP_BAD_REQUEST);
             }
 
             return rc;
         }
-
     }
 
-    Timer::instance()->add_timer(ev, 60000);
+    if (!ev->is_timer()) {
+        Timer::instance()->add_timer(ev, 60000);
+    }
 
     if (!ev->is_active()) {
         if (!add_event(ev, 0)) {
             close(HTTP_INTERNAL_SERVER_ERROR);
-            return IO_ERROR;
+            return SERVX_ERROR;
         }
     }
 
@@ -131,19 +135,17 @@ void http_wait_request_handler(Event* ev) {
 
     Logger::instance()->debug("recv data...");
 
-    int rc = recv(conn);
+    int rc = conn->recv_data();
 
-    Logger::instance()->debug("recv return, get %d", rc);
-
-    if (rc == IO_ERROR) {
+    if (rc == SERVX_ERROR) {
         conn->close();
         return;
     }
 
-    if (rc == IO_BLOCK) {
-        // if event already exists in timer
-        // it will delete the old one and insert
-        Timer::instance()->add_timer(ev, 60000);
+    if (rc == SERVX_NOT_READY) {
+        if (!ev->is_timer()) {
+            Timer::instance()->add_timer(ev, 60000);
+        }
         ConnectionPool::instance()->enable_reusable(conn);
 
         if (!ev->is_active()) {
@@ -156,7 +158,7 @@ void http_wait_request_handler(Event* ev) {
         return;
     }
 
-    if (rc == IO_FINISH) {
+    if (rc == SERVX_DONE) {
         // first time recv 0 byte
         Logger::instance()->info("client closed connection");
         conn->close();
@@ -195,16 +197,14 @@ void http_process_request_headers(Event* ev) {
     while (true) {
         if (buf->get_pos() + req->get_buf_offset() == buf->get_last()) {
             rc = req->read_request_header();
-            if (rc != IO_SUCCESS) {
+            if (rc != SERVX_OK) {
                 return;
             }
         }
 
-        Logger::instance()->debug("parsing request header...");
-
         rc = http_parse_request_headers(req);
 
-        if (rc == PARSE_SUCCESS) {
+        if (rc == SERVX_OK) {
             Logger::instance()->debug("parsing header success");
 
             auto host = req->get_headers("host");
@@ -264,7 +264,7 @@ void http_process_request_headers(Event* ev) {
             return;
         }
 
-        if (rc != PARSE_AGAIN) {
+        if (rc != SERVX_AGAIN) {
             req->finalize(HTTP_BAD_REQUEST);
             return;
         }
@@ -288,7 +288,7 @@ void http_process_request_line(Event* ev) {
     while (true) {
         if (buf->get_pos() + req->get_buf_offset() == buf->get_last()) {
             rc = req->read_request_header();
-            if (rc != IO_SUCCESS) {
+            if (rc != SERVX_OK) {
                 return;
             }
         }
@@ -297,7 +297,7 @@ void http_process_request_line(Event* ev) {
 
         rc = http_parse_request_line(req);
 
-        if (rc == PARSE_SUCCESS) {
+        if (rc == SERVX_OK) {
             Logger::instance()->debug("parsing request success!\n"   \
                                       "method: %s\n"                 \
                                       "schema: %s\n"                 \
@@ -319,7 +319,7 @@ void http_process_request_line(Event* ev) {
 
             // handle quoted
             if (req->is_quoted()) {
-                if (http_parse_quoted(req) == PARSE_ERROR) {
+                if (http_parse_quoted(req) == SERVX_ERROR) {
                     req->finalize(HTTP_BAD_REQUEST);
                     return;
                 }
@@ -327,7 +327,7 @@ void http_process_request_line(Event* ev) {
 
             // handle args
             if (!req->get_args().empty()) {
-                if (http_parse_args(req) == PARSE_ERROR) {
+                if (http_parse_args(req) == SERVX_ERROR) {
                     req->finalize(HTTP_BAD_REQUEST);
                     return;
                 }
@@ -343,7 +343,7 @@ void http_process_request_line(Event* ev) {
             return;
         }
 
-        if (rc != PARSE_AGAIN) {
+        if (rc != SERVX_AGAIN) {
             req->finalize(HTTP_BAD_REQUEST);
             return;
         }

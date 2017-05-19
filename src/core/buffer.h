@@ -1,11 +1,14 @@
 #ifndef _BUFFER_H_
 #define _BUFFER_H_
 
+#include <cstdint>
+
 namespace servx {
 
 class Buffer {
 public:
-    Buffer(int sz);
+    explicit Buffer(uint32_t cap);
+    Buffer(char* data, uint32_t size, bool del);
 
     Buffer(const Buffer&) = delete;
     Buffer(Buffer&&) = delete;
@@ -22,19 +25,19 @@ public:
 
     char *get_end() const { return end; }
 
-    int get_size() const { return size; }
-    int get_remain() const { return end - last; }
+    uint32_t get_size() const { return last - pos; }
+    uint32_t get_capacity() const { return end - start; }
+    uint32_t get_remain() const { return end - last; }
 
-    void reset();
     void shrink();
-    void enlarge(int sz);
+    void enlarge(uint32_t cap);
 
 private:
-    int size;
     char *start;
     char *end;
     char *pos;
     char *last;
+    bool deleteable;
 };
 
 }

@@ -51,11 +51,12 @@ void Clock::update() {
     char *s1 = const_cast<char*>(log_time[!cur].c_str());
     char *s2 = const_cast<char*>(http_time[!cur].c_str());
 
+    // Todo localtime
     sprintf(s1, "%4d/%02d/%02d %02d:%02d:%02d",
-        t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
+        t.tm_year + 1970, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
 
     sprintf(s2, "%s, %02d %s %4d %02d:%02d:%02d GMT",
-        week[t.tm_wday], t.tm_mday, months[t.tm_mon - 1], t.tm_year,
+        week[t.tm_wday], t.tm_mday, months[t.tm_mon - 1], t.tm_year + 1900,
         t.tm_hour, t.tm_min, t.tm_sec);
 
     cur = !cur;
@@ -70,7 +71,7 @@ int Clock::format_http_time(time_t sec, char* buf) {
     }
 
     return sprintf(buf, "%s, %02d %s %4d %02d:%02d:%02d GMT",
-        week[t.tm_wday], t.tm_mday, months[t.tm_mon - 1], t.tm_year,
+        week[t.tm_wday], t.tm_mday, months[t.tm_mon - 1], t.tm_year + 1900,
         t.tm_hour, t.tm_min, t.tm_sec);
 }
 
