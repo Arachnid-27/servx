@@ -3,7 +3,10 @@
 
 #include <sys/socket.h>
 
+#include <list>
+
 #include "buffer.h"
+#include "file.h"
 #include "inet.h"
 
 namespace servx {
@@ -106,6 +109,8 @@ public:
 
     int recv_data();
     int send_data(char* data, int size);
+    int send_chain(std::list<Buffer>& chain);
+    int send_file(File* file);
 
 private:
     uint64_t conn_id;

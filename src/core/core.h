@@ -3,7 +3,7 @@
 
 namespace servx {
 
-enum ReturnCode {
+enum ResultCode {
     SERVX_OK = 0,
     SERVX_AGAIN,
     SERVX_ERROR,

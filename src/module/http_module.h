@@ -83,39 +83,32 @@ public:
                         lambda_handler(client_max_body_size_handler), 1),
             new Command(LOCATION_BLOCK,
                         "root",
-                        lambda_handler(root_handler), 1)
+                        lambda_handler(root_handler), 1),
+            new Command(LOCATION_BLOCK,
+                        "sendfile",
+                        lambda_handler(sendfile_handler), 1)
         }), loc(nullptr) {}
 
     int http_handler(command_vals_t v);
-
     int server_handler(command_vals_t v);
-
     int location_handler(command_vals_t v);
-
     int address_handler(command_vals_t v);
 
     int server_name_handler(command_vals_t v);
 
     int addr_handler(command_vals_t v);
-
     int port_handler(command_vals_t v);
-
     int backlog_handler(command_vals_t v);
-
     int send_buf_handler(command_vals_t v);
-
     int recv_buf_handler(command_vals_t v);
 
     int client_max_body_size_handler(command_vals_t v);
-
     int root_handler(command_vals_t v);
+    int sendfile_handler(command_vals_t v);
 
     bool http_post_handler();
-
     bool server_post_handler();
-
     bool address_post_handler();
-
     bool location_post_handler();
 
 private:

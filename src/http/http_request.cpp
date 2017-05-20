@@ -119,6 +119,18 @@ int HttpRequest::read_request_header() {
 }
 
 void http_request_handler(Event* ev) {
+    HttpRequest *req = ev->get_connection()->
+        get_context<HttpConnection>()->get_request();
+
+    // Todo cancel dalay
+
+    if (ev->is_write_event()) {
+        req->handle_write();
+    } else {
+        req->handle_read();
+    }
+
+    // Todo process subrequest
 }
 
 void http_wait_request_handler(Event* ev) {

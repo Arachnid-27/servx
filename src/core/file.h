@@ -12,11 +12,11 @@ namespace servx {
 
 class File {
 public:
-    File(int f): fd(f) {}
+    File(int f): fd(f), offset(0) {}
 
-    File(const std::string& s): pathname(s) {}
-    File(std::string&& s): pathname(std::move(s)) {}
-    File(const char* s): pathname(s) {}
+    File(const std::string& s): offset(0), pathname(s) {}
+    File(std::string&& s): offset(0), pathname(std::move(s)) {}
+    File(const char* s): offset(0), pathname(s) {}
 
     File(const File&) = delete;
     File(File&&) = default;
@@ -28,25 +28,26 @@ public:
     const std::string& get_pathname() const { return pathname; }
 
     bool open(int flags);
-
     bool open(int flags, mode_t mode);
 
     int read(char* buf, int count) { return ::read(fd, buf, count); }
-
     int write(char* buf, int count) { return ::write(fd, buf, count); }
+    int send(int out_fd, int count);
 
     bool file_status();
 
     bool is_dir() const { return info != nullptr && (S_ISDIR(info->st_mode)); }
-
     bool is_file() const { return info != nullptr && (S_ISREG(info->st_mode)); }
 
     long get_file_size() const;
-
     long get_modify_time() const;
+
+    long get_offset() const { return offset; }
+    void set_offset(long n) { offset = n; }
 
 private:
     int fd;
+    long offset;
     std::string pathname;
     std::unique_ptr<struct stat> info;
 };

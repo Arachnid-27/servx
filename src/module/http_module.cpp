@@ -91,11 +91,28 @@ int MainHttpModule::root_handler(command_vals_t v) {
     } else {
         loc->set_root(v[0]);
     }
+
+    return NULL_BLOCK;
+}
+
+int MainHttpModule::sendfile_handler(command_vals_t v) {
+    if (v[0] == "on") {
+        loc->set_send_file(true);
+    }
     return NULL_BLOCK;
 }
 
 bool MainHttpModule::http_post_handler() {
     conf.servers.shrink_to_fit();
+
+    ModuleManager::instance()->for_each([](Module* module) {
+            if (module->get_type() == HTTP_MODULE) {
+                return static_cast<HttpModule*>(module)->post_configuration();
+            }
+            return true;
+        });
+
+    HttpPhaseRunner::instance()->init();
     return true;
 }
 

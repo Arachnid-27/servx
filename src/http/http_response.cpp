@@ -41,7 +41,8 @@ std::unordered_map<int, std::string> HttpResponse::status_lines = {
 };
 
 HttpResponse::HttpResponse(Connection* c)
-    : conn(c), content_length(-1), last_modified_time(-1), status(-1) {
+    : conn(c), content_length(-1),
+      last_modified_time(-1), status(-1) {
 }
 
 int HttpResponse::send_header() {
@@ -59,10 +60,13 @@ int HttpResponse::send_header() {
         header_only = 1;
     }
 
-    out.emplace_back(2048);
+    out.emplace_back();
+
+    std::list<Buffer> &chain = out.back().chain;
+    chain.emplace_back(2048);
 
     int n;
-    Buffer *buf = &out.back();
+    Buffer *buf = &chain.back();
     char *pos = buf->get_pos();
 
     n = sprintf(pos, "HTTP/1.1 %d %s\r\n",
@@ -125,8 +129,8 @@ int HttpResponse::send_header() {
         // but we should discard the last result (don't invoke set_last)
         // becase we don't know if it is truncated
         if (pos + n == buf->get_end()) {
-            out.emplace_back(2048);
-            buf = &out.back();
+            chain.emplace_back(2048);
+            buf = &chain.back();
             pos = buf->get_pos();
             n = snprintf(pos, buf->get_remain(), "%s:%s\r\n",
                          s.first.c_str(), s.second.c_str());
@@ -137,8 +141,8 @@ int HttpResponse::send_header() {
     }
 
     if (buf->get_remain() < 2) {
-        out.emplace_back(4);
-        buf = &out.back();
+        chain.emplace_back(2);
+        buf = &chain.back();
         pos = buf->get_pos();
     }
 
@@ -147,22 +151,74 @@ int HttpResponse::send_header() {
 
     buf->set_last(pos + 2);
 
-    int rc = io_send_chain(conn->get_fd(), out);
+    int rc = conn->send_chain(chain);
 
     if (rc == SERVX_ERROR) {
         return SERVX_ERROR;
     }
 
-    auto iter = out.begin();
-    while (iter != out.end()) {
-        if (iter->get_size() == 0) {
-            iter = out.erase(iter);
-        } else {
-            ++iter;
+    return rc == SERVX_OK ? SERVX_OK : SERVX_AGAIN;
+}
+
+int HttpResponse::send_body(std::unique_ptr<File>&& p) {
+    std::list<std::unique_ptr<File>> &files = out.back().files;
+    files.emplace_back(std::move(p));
+    return send();
+}
+
+int HttpResponse::send_body(std::list<Buffer>&& chain) {
+    if (!out.back().files.empty()) {
+        out.emplace_back();
+    }
+    auto &l = out.back().chain;
+    l.splice(l.end(), std::move(chain));
+    return send();
+}
+
+int HttpResponse::send() {
+    int rc = SERVX_OK;
+
+    while (!out.empty()) {
+        Sendable &sa = out.front();
+
+        if (!sa.chain.empty()) {
+            rc = conn->send_chain(sa.chain);
+            if (rc == SERVX_ERROR) {
+                return SERVX_ERROR;
+            }
+            if (rc != SERVX_OK) {
+                return SERVX_AGAIN;
+            }
         }
+
+        if (!sa.files.empty()) {
+            if (location->is_send_file()) {
+                for (auto &f : sa.files) {
+                    rc = conn->send_file(f.get());
+                    if (rc == SERVX_ERROR) {
+                        return SERVX_ERROR;
+                    }
+                    if (rc != SERVX_OK) {
+                        return SERVX_AGAIN;
+                    }
+                }
+            } else {
+                for (auto &f : sa.files) {
+                    if (!f->file_status()) {
+                        return SERVX_ERROR;
+                    }
+                    sa.chain.emplace_back(f->get_file_size());
+                    // TODO: the result of read
+                    f->read(sa.chain.back().get_pos(), f->get_file_size());
+                }
+                continue;
+            }
+        }
+
+        out.pop_front();
     }
 
-    return rc == SERVX_PARTIAL ? SERVX_AGAIN : SERVX_OK;
+    return SERVX_OK;
 }
 
 }

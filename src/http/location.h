@@ -12,7 +12,7 @@ namespace servx {
 
 class Location {
 public:
-    Location(const std::string& s);
+    explicit Location(const std::string& s);
 
     Location(const Location&) = delete;
     Location(const Location&&) = delete;
@@ -32,8 +32,13 @@ public:
     void set_root(const std::string& s) { root = s; }
     void set_root(std::string&& s) { root = std::move(s); }
 
+    bool is_send_file() const { return send_file; }
+    void set_send_file(bool s) { send_file = s; }
+
 private:
-    bool regex;
+    uint32_t regex:1;
+    uint32_t send_file:1;
+
     std::string root;
     std::string uri;
     std::unique_ptr<ModuleConf> confs[NULL_MODULE];

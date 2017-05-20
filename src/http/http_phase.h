@@ -17,17 +17,6 @@ enum HttpPhase {
     HTTP_LOG_PHASE
 };
 
-enum HttpPhaseResultCode {
-    HTTP_NEXT_PHASE,
-    HTTP_NEXT_HANDLER,
-    HTTP_PHASE_AGAIN,
-    HTTP_PHASE_SUCCESS,
-    HTTP_PHASE_ERROR,
-
-    HTTP_CHECKER_AGAIN,
-    HTTP_CHECKER_OK
-};
-
 class HttpRequest;
 
 class HttpPhaseHandler {

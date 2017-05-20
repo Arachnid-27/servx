@@ -7,6 +7,7 @@
 
 #include "connection.h"
 #include "file.h"
+#include "location.h"
 
 namespace servx {
 
@@ -41,7 +42,7 @@ enum HttpStateCode {
 
 class HttpResponse {
 public:
-    HttpResponse(Connection* c);
+    explicit HttpResponse(Connection* c);
 
     HttpResponse(const HttpResponse&) = delete;
     HttpResponse(HttpResponse&&) = delete;
@@ -72,13 +73,23 @@ public:
     void set_keep_alive(bool k) { keep_alive = k; }
 
     int send_header();
-    int send_body();
+    int send_body(std::unique_ptr<File>&& p);
+    int send_body(std::list<Buffer>&& chain);
+    int send();
 
     void set_etag(bool e) { etag = e; };
 
+    void set_location(Location* loc) { location = loc; }
+
 private:
+    struct Sendable {
+        std::list<Buffer> chain;
+        std::list<std::unique_ptr<File>> files;
+    };
+
     std::unordered_map<std::string, std::string> headers;
     Connection *conn;
+    Location *location;
     long content_length;
     long last_modified_time;
     int status;
@@ -88,8 +99,7 @@ private:
     uint32_t keep_alive:1;
     uint32_t etag:1;
 
-    std::unique_ptr<File> file;
-    std::list<Buffer> out;
+    std::list<Sendable> out;
 
     static std::unordered_map<int, std::string> status_lines;
 };

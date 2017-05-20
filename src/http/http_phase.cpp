@@ -1,5 +1,6 @@
 #include "http_phase.h"
 
+#include "core.h"
 #include "logger.h"
 
 namespace servx {
@@ -14,7 +15,7 @@ void HttpPhaseRunner::run(HttpRequest* req) {
         size_t index = req->get_phase_handler();
         int rc = phase_handlers[index].check(req);
 
-        if (rc == HTTP_CHECKER_OK) {
+        if (rc == SERVX_OK) {
             return;
         }
     }
@@ -24,23 +25,23 @@ int HttpPhaseRunner::generic_phase_checker(
     HttpRequest* req, HttpPhaseHandler* ph) {
     int rc = ph->handle(req);
 
-    if (rc == HTTP_NEXT_PHASE) {
+    if (rc == SERVX_DENY) {
         req->set_phase_handler(ph->get_next());
-        return HTTP_CHECKER_AGAIN;
+        return SERVX_AGAIN;
     }
 
-    if (rc == HTTP_NEXT_HANDLER) {
+    if (rc == SERVX_DONE) {
         req->next_phase_handler();
-        return HTTP_CHECKER_AGAIN;
+        return SERVX_AGAIN;
     }
 
-    if (rc == HTTP_PHASE_AGAIN) {
-        return HTTP_CHECKER_OK;
+    if (rc == SERVX_AGAIN) {
+        return SERVX_OK;
     }
 
     req->finalize(rc);
 
-    return HTTP_CHECKER_OK;
+    return SERVX_OK;
 }
 
 int HttpPhaseRunner::find_config_phase_checker(
@@ -49,7 +50,7 @@ int HttpPhaseRunner::find_config_phase_checker(
 
     if (loc == nullptr) {
         req->finalize(HTTP_NOT_FOUND);
-        return HTTP_CHECKER_OK;
+        return SERVX_OK;
     }
 
     if (req->get_content_length() > 0 &&
@@ -58,39 +59,42 @@ int HttpPhaseRunner::find_config_phase_checker(
         Logger::instance()->warn("client body too large, %d bytes in tatol",
             req->get_content_length());
         req->finalize(HTTP_REQUEST_ENTITY_TOO_LARGE);
-        return HTTP_CHECKER_OK;
+        return SERVX_OK;
     }
 
+    req->set_location(loc);
+    req->get_response()->set_location(loc);
+
     req->next_phase_handler();
-    return HTTP_CHECKER_AGAIN;
+    return SERVX_AGAIN;
 }
 
 int HttpPhaseRunner::content_phase_checker(
     HttpRequest* req, HttpPhaseHandler* ph) {
     if (req->get_content_handler() != nullptr) {
         // Todo
-        return HTTP_CHECKER_OK;
+        return SERVX_OK;
     }
 
     int rc = ph->handle(req);
 
-    if (rc != HTTP_NEXT_HANDLER) {
+    if (rc != SERVX_DENY) {
         req->finalize(rc);
-        return HTTP_CHECKER_OK;
+        return SERVX_OK;
     }
 
     if (req->get_phase_handler() < phase_handlers.size() - 1) {
         req->next_phase_handler();
-        return HTTP_CHECKER_AGAIN;
+        return SERVX_AGAIN;
     }
 
     if (req->get_uri().back() == '/') {
         req->finalize(HTTP_FORBIDDEN);
-        return HTTP_CHECKER_OK;
+        return SERVX_OK;
     }
 
     req->finalize(HTTP_NOT_FOUND);
-    return HTTP_CHECKER_OK;
+    return SERVX_OK;
 }
 
 }

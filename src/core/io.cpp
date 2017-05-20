@@ -84,35 +84,47 @@ int io_send_chain(int fd, std::list<Buffer>& chain) {
         }
     }
 
-    int n = writev(fd, iovs, cnt);
-    if (n < 0) {
+    while (true) {
+        int n = writev(fd, iovs, cnt);
+
+        if (n >= 0) {
+            if (n < total) {
+                int size;
+                for (auto &buf : chain) {
+                    size = buf.get_size();
+                    if (n <= size) {
+                        buf.set_pos(buf.get_pos() + n);
+                        break;
+                    } else {
+                        buf.set_pos(buf.get_last());
+                        n -= size;
+                    }
+                }
+                return SERVX_PARTIAL;
+            } else {
+                for (auto &buf : chain) {
+                    if (cnt == 0) {
+                        return SERVX_PARTIAL;
+                    }
+                    buf.set_pos(buf.get_last());
+                    --cnt;
+                }
+                return SERVX_OK;
+            }
+        }
+
+        int err = errno;
+
+        if (err == EINTR) {
+            continue;
+        }
+
+        if (err == EAGAIN) {
+            return SERVX_NOT_READY;
+        }
+
         return SERVX_ERROR;
     }
-
-    if (n < total) {
-        int size;
-        for (auto &buf : chain) {
-            size = buf.get_size();
-            if (n <= size) {
-                buf.set_pos(buf.get_pos() + n);
-                break;
-            } else {
-                buf.set_pos(buf.get_last());
-                n -= size;
-            }
-        }
-        return SERVX_PARTIAL;
-    } else {
-        for (auto &buf : chain) {
-            if (cnt == 0) {
-                return SERVX_PARTIAL;
-            }
-            buf.set_pos(buf.get_last());
-            --cnt;
-        }
-    }
-
-    return SERVX_OK;
 }
 
 }

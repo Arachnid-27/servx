@@ -5,7 +5,8 @@
 namespace servx {
 
 Location::Location(const std::string& s)
-    : uri(s), client_max_body_size(1024) {
+    : regex(false), send_file(false),
+      uri(s), client_max_body_size(1024) {
     auto manager = HttpModuleManager::instance();
     for (int i = 0; i < NULL_MODULE; ++i) {
         auto module = manager->get_module(i);

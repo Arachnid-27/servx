@@ -116,21 +116,76 @@ int Connection::send_data(char* data, int size) {
     Buffer buf(data, size, false);
     int rc = io_send(socket_fd, &buf);
 
-    // Todo record bytes the conn sent
+    // TODO: record bytes the conn sent
 
     switch (rc) {
     case SERVX_OK:
         break;
-    case SERVX_DONE:
-        read_event.set_eof(true);
-        break;
     case SERVX_ERROR:
-        read_event.set_error(true);
+        write_event.set_error(true);
+        // fall
+    default:
+        write_event.set_ready(false);
         break;
     }
 
-    read_event.set_ready(false);
+    return rc;
+}
 
+int Connection::send_chain(std::list<Buffer>& chain) {
+    int rc;
+
+    while (true) {
+        rc = io_send_chain(socket_fd, chain);
+
+        if (rc == SERVX_ERROR) {
+            write_event.set_ready(false);
+            write_event.set_error(true);
+            return SERVX_ERROR;
+        }
+
+        auto iter = chain.begin();
+        while (iter != chain.end()) {
+            if (iter->get_size() == 0) {
+                iter = chain.erase(iter);
+            } else {
+                ++iter;
+            }
+        }
+
+        if (rc == SERVX_OK) {
+            if (!chain.empty()) {
+                continue;
+            }
+            return SERVX_OK;
+        }
+
+        write_event.set_ready(false);
+        return rc;
+    }
+}
+
+int Connection::send_file(File* file) {
+    if (!file->file_status()) {
+        return SERVX_ERROR;
+    }
+
+    // TODO: speed limit
+
+    // FIXME: file_size will be cast down
+    int rc = file->send(socket_fd, file->get_file_size());
+
+    if (rc == SERVX_PARTIAL) {
+        if (file->get_offset() == file->get_file_size()) {
+            return SERVX_OK;
+        }
+    }
+
+    if (rc == SERVX_ERROR) {
+        write_event.set_error(true);
+    }
+
+    write_event.set_ready(false);
     return rc;
 }
 

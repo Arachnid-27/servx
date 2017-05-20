@@ -27,7 +27,7 @@ using http_req_handler_t = std::function<void(HttpRequest*)>;
 
 class HttpRequest {
 public:
-    HttpRequest(Connection* c);
+    explicit HttpRequest(Connection* c);
 
     HttpRequest(const HttpRequest&) = delete;
     HttpRequest(HttpRequest&&) = delete;

@@ -53,7 +53,7 @@ void Clock::update() {
 
     // Todo localtime
     sprintf(s1, "%4d/%02d/%02d %02d:%02d:%02d",
-        t.tm_year + 1970, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
+        t.tm_year + 1900, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
 
     sprintf(s2, "%s, %02d %s %4d %02d:%02d:%02d GMT",
         week[t.tm_wday], t.tm_mday, months[t.tm_mon - 1], t.tm_year + 1900,
