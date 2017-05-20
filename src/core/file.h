@@ -54,12 +54,12 @@ private:
 
 inline bool File::open(int flags) {
     fd = ::open(pathname.c_str(), flags);
-    return fd == -1;
+    return fd != -1;
 }
 
 inline bool File::open(int flags, mode_t mode) {
     fd = ::open(pathname.c_str(), flags, mode);
-    return fd == -1;
+    return fd != -1;
 }
 
 inline long File::get_file_size() const {

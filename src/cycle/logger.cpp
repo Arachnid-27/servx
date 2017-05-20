@@ -42,7 +42,7 @@ void Logger::open_files() {
     mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH;
 
     while (iter != files.end()) {
-        if (iter->open(flags, mode) != 0) {
+        if (!iter->open(flags, mode)) {
             warn("open %s failed, ignore", iter->get_pathname().c_str());
             iter = files.erase(iter);
         } else {

@@ -1,6 +1,6 @@
 #include "http_module.h"
 
-#include "http_request.h"
+#include "http_phase.h"
 #include "module_manager.h"
 #include "listener.h"
 

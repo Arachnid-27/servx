@@ -145,12 +145,8 @@ int Connection::send_chain(std::list<Buffer>& chain) {
         }
 
         auto iter = chain.begin();
-        while (iter != chain.end()) {
-            if (iter->get_size() == 0) {
-                iter = chain.erase(iter);
-            } else {
-                ++iter;
-            }
+        while (iter != chain.end() && iter->get_size() == 0) {
+            iter = chain.erase(iter);
         }
 
         if (rc == SERVX_OK) {
@@ -172,7 +168,7 @@ int Connection::send_file(File* file) {
 
     // TODO: speed limit
 
-    // FIXME: file_size will be cast down
+    // FIXME: file_size will be cast
     int rc = file->send(socket_fd, file->get_file_size());
 
     if (rc == SERVX_PARTIAL) {

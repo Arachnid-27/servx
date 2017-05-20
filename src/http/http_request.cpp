@@ -5,6 +5,7 @@
 #include "connection_pool.h"
 #include "core.h"
 #include "event_module.h"
+#include "http_phase.h"
 #include "http_parse.h"
 #include "io.h"
 #include "logger.h"
@@ -15,7 +16,8 @@ namespace servx {
 HttpRequest::HttpRequest(Connection* c)
     : conn(c), http_method(HTTP_METHOD_UNKONWN), parse_state(0),
       buf_offset(0), content_length(-1), response(new HttpResponse(c)),
-      phase_handler(0), content_handler(nullptr), server(nullptr),
+      phase(HTTP_POST_READ_PHASE), phase_index(0),
+      content_handler(nullptr), server(nullptr),
       quoted(false), chunked(false), keep_alive(false) {
 }
 
@@ -272,6 +274,8 @@ void http_process_request_headers(Event* ev) {
             req->set_read_handler(http_block_reading);
             req->set_write_handler([](HttpRequest* req)
                 { HttpPhaseRunner::instance()->run(req); });
+
+            req->handle_write();
 
             return;
         }

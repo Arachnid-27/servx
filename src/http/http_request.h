@@ -4,29 +4,17 @@
 #include <unordered_map>
 
 #include "connection.h"
-#include "http_phase.h"
+#include "http.h"
 #include "http_response.h"
 #include "server.h"
 
 namespace servx {
 
-enum HttpMethod {
-    HTTP_METHOD_UNKONWN,
-    HTTP_METHOD_GET,
-    HTTP_METHOD_HEAD,
-    HTTP_METHOD_POST,
-    HTTP_METHOD_PUT,
-    HTTP_METHOD_DELETE,
-    HTTP_METHOD_OPTIONS
-};
-
-class HttpRequest;
-class HttpPhaseHandler;
-
-using http_req_handler_t = std::function<void(HttpRequest*)>;
-
 class HttpRequest {
 public:
+    using http_phase_handler_t = std::function<int(HttpRequest*)>;
+    using http_req_handler_t = std::function<void(HttpRequest*)>;
+
     explicit HttpRequest(Connection* c);
 
     HttpRequest(const HttpRequest&) = delete;
@@ -94,12 +82,14 @@ public:
 
     std::string get_headers(const char* s) const;
 
-    size_t get_phase_handler() const { return phase_handler; }
-    void set_phase_handler(size_t index) { phase_handler = index; }
-    void next_phase_handler() { ++phase_handler; }
+    uint32_t get_phase() const { return phase; }
+    void next_phase() { ++phase; phase_index = 0; }
 
-    void get_content_handler(HttpPhaseHandler* h) { content_handler = h; }
-    HttpPhaseHandler* get_content_handler() const { return content_handler; }
+    uint32_t get_phase_index() const { return phase_index; }
+    void next_phase_index() { ++phase_index; }
+
+    http_phase_handler_t get_content_handler() { return content_handler; }
+    void get_content_handler(const http_phase_handler_t& h);
 
     bool is_discard_body() const { return discard_body; }
     bool discard_request_body();
@@ -127,8 +117,9 @@ private:
 
     std::unique_ptr<HttpResponse> response;
 
-    size_t phase_handler;
-    HttpPhaseHandler *content_handler;
+    uint32_t phase;
+    uint32_t phase_index;
+    http_phase_handler_t content_handler;
 
     Server *server;
     Location *location;
@@ -149,6 +140,10 @@ private:
     std::string args;
     std::string version;
 };
+
+inline void HttpRequest::get_content_handler(const http_phase_handler_t& h) {
+    content_handler = h;
+}
 
 inline void HttpRequest::set_headers_value(std::string&& s) {
     headers.emplace(std::move(name), std::move(s));

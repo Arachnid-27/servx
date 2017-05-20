@@ -40,7 +40,7 @@ bool LocationTree::push(Location* loc) {
         return false;
     }
 
-    node->loc = std::unique_ptr<Location>(new Location(uri));
+    node->loc = std::unique_ptr<Location>(loc);
     return true;
 }
 
@@ -51,10 +51,11 @@ Location* LocationTree::find(const std::string& uri) {
 
     Location* result = nullptr;
     LocationTreeNode* node = root.get();
+    auto length = uri.length();
     decltype(node->child.find(0)) it;
 
-    for (auto ch : uri) {
-        it = node->child.find(ch);
+    for (size_t i = 1; i < length; ++i) {
+        it = node->child.find(uri[i]);
         if (it == node->child.end()) {
             break;
         }

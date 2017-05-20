@@ -8,12 +8,37 @@ namespace servx {
 HttpPhaseRunner* HttpPhaseRunner::runner = new HttpPhaseRunner;
 
 void HttpPhaseRunner::init() {
+    phase_handlers[HTTP_FIND_CONFIG_PHASE].push_back(find_config_handler);
 }
 
 void HttpPhaseRunner::run(HttpRequest* req) {
+    int rc;
+
     while (true) {
-        size_t index = req->get_phase_handler();
-        int rc = phase_handlers[index].check(req);
+        uint32_t phase = req->get_phase();
+        auto &vec = phase_handlers[phase];
+
+        if (vec.empty()) {
+            req->next_phase();
+            continue;
+        }
+
+        if (vec.size() < req->get_phase_index() + 1) {
+            Logger::instance()->info("all %d phase handler deny!", phase);
+            req->finalize(HTTP_FORBIDDEN);
+            return;
+        }
+
+        switch (phase) {
+        case HTTP_CONTENT_PHASE:
+            rc = content_phase_checker(req);
+            break;
+        default:
+            rc = generic_phase_checker(req);
+            break;
+        }
+
+        Logger::instance()->debug("phase %d, get %d", phase, rc);
 
         if (rc == SERVX_OK) {
             return;
@@ -21,17 +46,19 @@ void HttpPhaseRunner::run(HttpRequest* req) {
     }
 }
 
-int HttpPhaseRunner::generic_phase_checker(
-    HttpRequest* req, HttpPhaseHandler* ph) {
-    int rc = ph->handle(req);
+int HttpPhaseRunner::generic_phase_checker(HttpRequest* req) {
+    auto &handler = phase_handlers[req->get_phase()][req->get_phase_index()];
+    int rc = handler(req);
+
+    Logger::instance()->debug("generic phase checker get %d", rc);
 
     if (rc == SERVX_DENY) {
-        req->set_phase_handler(ph->get_next());
+        req->next_phase_index();
         return SERVX_AGAIN;
     }
 
     if (rc == SERVX_DONE) {
-        req->next_phase_handler();
+        req->next_phase();
         return SERVX_AGAIN;
     }
 
@@ -40,51 +67,28 @@ int HttpPhaseRunner::generic_phase_checker(
     }
 
     req->finalize(rc);
-
     return SERVX_OK;
 }
 
-int HttpPhaseRunner::find_config_phase_checker(
-    HttpRequest* req, HttpPhaseHandler* ph) {
-    Location *loc = req->get_server()->find_location(req->get_uri());
-
-    if (loc == nullptr) {
-        req->finalize(HTTP_NOT_FOUND);
-        return SERVX_OK;
-    }
-
-    if (req->get_content_length() > 0 &&
-        loc->get_client_max_body_size() <
-        static_cast<uint32_t>(req->get_content_length())) {
-        Logger::instance()->warn("client body too large, %d bytes in tatol",
-            req->get_content_length());
-        req->finalize(HTTP_REQUEST_ENTITY_TOO_LARGE);
-        return SERVX_OK;
-    }
-
-    req->set_location(loc);
-    req->get_response()->set_location(loc);
-
-    req->next_phase_handler();
-    return SERVX_AGAIN;
-}
-
-int HttpPhaseRunner::content_phase_checker(
-    HttpRequest* req, HttpPhaseHandler* ph) {
+int HttpPhaseRunner::content_phase_checker(HttpRequest* req) {
     if (req->get_content_handler() != nullptr) {
-        // Todo
+        // TODO: content handler
         return SERVX_OK;
     }
 
-    int rc = ph->handle(req);
+    auto &vec = phase_handlers[req->get_phase()];
+    auto &handler = vec[req->get_phase_index()];
+    int rc = handler(req);
+
+    Logger::instance()->debug("content phase checker get %d", rc);
 
     if (rc != SERVX_DENY) {
         req->finalize(rc);
         return SERVX_OK;
     }
 
-    if (req->get_phase_handler() < phase_handlers.size() - 1) {
-        req->next_phase_handler();
+    if (req->get_phase_index() < vec.size() - 1) {
+        req->next_phase_index();
         return SERVX_AGAIN;
     }
 
@@ -95,6 +99,27 @@ int HttpPhaseRunner::content_phase_checker(
 
     req->finalize(HTTP_NOT_FOUND);
     return SERVX_OK;
+}
+
+int HttpPhaseRunner::find_config_handler(HttpRequest* req) {
+    Location *loc = req->get_server()->find_location(req->get_uri());
+    if (loc == nullptr) {
+        Logger::instance()->info("can not find %s", req->get_uri().c_str());
+        return HTTP_NOT_FOUND;
+    }
+
+    if (req->get_content_length() > 0 &&
+        loc->get_client_max_body_size() <
+        static_cast<uint32_t>(req->get_content_length())) {
+        Logger::instance()->warn("client body too large, %d bytes in tatol",
+            req->get_content_length());
+        return HTTP_REQUEST_ENTITY_TOO_LARGE;
+    }
+
+    req->set_location(loc);
+    req->get_response()->set_location(loc);
+
+    return SERVX_DONE;
 }
 
 }

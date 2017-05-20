@@ -11,33 +11,33 @@
 
 namespace servx {
 
-std::unordered_map<int, std::string> HttpResponse::status_lines = {
-    { HTTP_CONTINUE, "Continue" },
+std::string HttpResponse::status_lines[] = {
+    "100 Continue",
 
-    { HTTP_OK, "OK" },
-    { HTTP_PARTIAL_CONTENT, "Partial Content" },
+    "200 OK",
+    "206 Partial Content",
 
-    { HTTP_MOVED_PERMANENTLY, "Moved Permanently" },
-    { HTTP_MOVED_TEMPORARILY, "Moved Temporarily" },
-    { HTTP_NOT_MODIFIED, "Not Modified" },
+    "301 Moved Permanently",
+    "302 Moved Temporarily",
+    "304 Not Modified",
 
-    { HTTP_BAD_REQUEST, "Bad Request" },
-    { HTTP_UNAUTHORIZED, "Unauthorized" },
-    { HTTP_FORBIDDEN, "Forbidden" },
-    { HTTP_NOT_FOUND, "Not Found" },
-    { HTTP_NOT_ALLOWED, "Not Allowed" },
-    { HTTP_REQUEST_TIME_OUT, "Request Time-out" },
-    { HTTP_CONFLICT, "Conflict" },
-    { HTTP_LENGTH_REQUIRED, "Length Required" },
-    { HTTP_PRECONDITION_FAILED, "Precondition Failed" },
-    { HTTP_REQUEST_ENTITY_TOO_LARGE, "Request Entity Too Large" },
-    { HTTP_REQUEST_URI_TOO_LARGE, "Request-URI Too Large" },
+    "400 Bad Request",
+    "401 Unauthorized",
+    "402 Forbidden",
+    "404 Not Found",
+    "405 Not Allowed",
+    "408 Request Time-out",
+    "409 Conflict",
+    "411 Length Required",
+    "412 Precondition Failed",
+    "413 Request Entity Too Large",
+    "414 Request-URI Too Large",
 
-    { HTTP_INTERNAL_SERVER_ERROR, "Internal Server Error" },
-    { HTTP_NOT_IMPLEMENTED, "Not Implemented" },
-    { HTTP_BAD_GATEWAY, "Bad Gateway" },
-    { HTTP_SERVICE_UNAVAILABLE, "Service Temporarily Unavailable" },
-    { HTTP_GATEWAY_TIME_OUT, "Gateway Time-out" }
+    "500 Internal Server Error",
+    "501 Not Implemented",
+    "502 Bad Gateway",
+    "503 Service Temporarily Unavailable",
+    "504 Gateway Time-out"
 };
 
 HttpResponse::HttpResponse(Connection* c)
@@ -69,8 +69,7 @@ int HttpResponse::send_header() {
     Buffer *buf = &chain.back();
     char *pos = buf->get_pos();
 
-    n = sprintf(pos, "HTTP/1.1 %d %s\r\n",
-                status, status_lines[status].c_str());
+    n = sprintf(pos, "HTTP/1.1 %s\r\n", status_lines[status - 10].c_str());
     pos += n;
 
     n = sprintf(pos, "Server:servx/0.1\r\n");
@@ -211,6 +210,7 @@ int HttpResponse::send() {
                     // TODO: the result of read
                     f->read(sa.chain.back().get_pos(), f->get_file_size());
                 }
+                sa.files.clear();
                 continue;
             }
         }

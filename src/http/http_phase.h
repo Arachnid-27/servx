@@ -8,46 +8,10 @@
 
 namespace servx {
 
-enum HttpPhase {
-    HTTP_POST_READ_PHASE,
-//  HTTP_REWRITE_PHASE
-    HTTP_FIND_CONFIG_PHASE,
-//  HTTP_ACCESS_PHASE,
-    HTTP_CONTENT_PHASE,
-    HTTP_LOG_PHASE
-};
-
-class HttpRequest;
-
-class HttpPhaseHandler {
-public:
-    HttpPhaseHandler(
-        const std::function<int(HttpRequest*)>& h,
-        const std::function<int(HttpRequest*, HttpPhaseHandler*)>& c,
-        size_t n)
-        : handler(h), checker(c), next(n) {}
-
-    HttpPhaseHandler(const HttpPhaseHandler&) = delete;
-    HttpPhaseHandler(HttpPhaseHandler&&) = delete;
-    HttpPhaseHandler& operator=(const HttpPhaseHandler&) = delete;
-    HttpPhaseHandler& operator=(HttpPhaseHandler&&) = delete;
-
-    ~HttpPhaseHandler() = default;
-
-    int check(HttpRequest* req) { return checker(req, this); }
-
-    int handle(HttpRequest* req) { return handler(req); }
-
-    size_t get_next() const { return next; }
-
-private:
-    std::function<int(HttpRequest*)> handler;
-    std::function<int(HttpRequest*, HttpPhaseHandler*)> checker;
-    size_t next;
-};
-
 class HttpPhaseRunner {
 public:
+    using http_phase_handler_t = std::function<int(HttpRequest*)>;
+
     HttpPhaseRunner(const HttpPhaseRunner&) = delete;
     HttpPhaseRunner(HttpPhaseRunner&&) = delete;
     HttpPhaseRunner& operator=(const HttpPhaseRunner&) = delete;
@@ -56,33 +20,32 @@ public:
     ~HttpPhaseRunner() = default;
 
     void register_handler(HttpPhase phase,
-        const std::function<int(HttpRequest*)>& h);
+        const http_phase_handler_t& h);
 
     void init();
 
     void run(HttpRequest* req);
+
+    static int find_config_handler(HttpRequest* req);
 
     static HttpPhaseRunner* instance() { return runner; }
 
 private:
     HttpPhaseRunner() = default;
 
-    int generic_phase_checker(HttpRequest* req, HttpPhaseHandler* ph);
-//  int rewrite_phase_checker(HttpRequest* req, HttpPhaseHandler* ph);
-    int find_config_phase_checker(HttpRequest* req, HttpPhaseHandler* ph);
-//  int access_phase_checker(HttpRequest* req, HttpPhaseHandler* ph);
-    int content_phase_checker(HttpRequest* req, HttpPhaseHandler* ph);
+    int generic_phase_checker(HttpRequest* req);
+//  int rewrite_phase_checker(HttpRequest* req);
+//  int access_phase_checker(HttpRequest* req);
+    int content_phase_checker(HttpRequest* req);
 
-    std::vector<HttpPhaseHandler> phase_handlers;
-    std::vector<
-        std::function<int(HttpRequest*)>> handlers[HTTP_LOG_PHASE + 1];
+    std::vector<http_phase_handler_t> phase_handlers[HTTP_LOG_PHASE + 1];
 
     static HttpPhaseRunner* runner;
 };
 
 inline void HttpPhaseRunner::register_handler(
-    HttpPhase phase, const std::function<int(HttpRequest*)>& h) {
-    handlers[phase].push_back(h);
+    HttpPhase phase, const http_phase_handler_t& h) {
+    phase_handlers[phase].push_back(h);
 }
 
 }

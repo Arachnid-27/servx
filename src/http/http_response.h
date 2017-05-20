@@ -7,38 +7,10 @@
 
 #include "connection.h"
 #include "file.h"
+#include "http.h"
 #include "location.h"
 
 namespace servx {
-
-enum HttpStateCode {
-    HTTP_CONTINUE = 100,
-
-    HTTP_OK = 200,
-    HTTP_PARTIAL_CONTENT = 206,
-
-    HTTP_MOVED_PERMANENTLY = 301,
-    HTTP_MOVED_TEMPORARILY = 302,
-    HTTP_NOT_MODIFIED = 304,
-
-    HTTP_BAD_REQUEST = 400,
-    HTTP_UNAUTHORIZED = 401,
-    HTTP_FORBIDDEN = 403,
-    HTTP_NOT_FOUND = 404,
-    HTTP_NOT_ALLOWED = 405,
-    HTTP_REQUEST_TIME_OUT = 408,
-    HTTP_CONFLICT = 409,
-    HTTP_LENGTH_REQUIRED = 411,
-    HTTP_PRECONDITION_FAILED = 412,
-    HTTP_REQUEST_ENTITY_TOO_LARGE = 413,
-    HTTP_REQUEST_URI_TOO_LARGE = 414,
-
-    HTTP_INTERNAL_SERVER_ERROR = 500,
-    HTTP_NOT_IMPLEMENTED = 501,
-    HTTP_BAD_GATEWAY = 502,
-    HTTP_SERVICE_UNAVAILABLE = 503,
-    HTTP_GATEWAY_TIME_OUT = 504
-};
 
 class HttpResponse {
 public:
@@ -101,7 +73,7 @@ private:
 
     std::list<Sendable> out;
 
-    static std::unordered_map<int, std::string> status_lines;
+    static std::string status_lines[HTTP_GATEWAY_TIME_OUT + 1];
 };
 
 template <typename T1, typename T2>

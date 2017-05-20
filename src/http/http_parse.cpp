@@ -2,10 +2,6 @@
 
 #include "core.h"
 
-#define CR      '\r'
-#define LF      '\n'
-#define CRLF    "\r\n"
-
 #define LOWER_CASE(ch) (ch | 0x20)
 
 namespace servx {
@@ -572,11 +568,6 @@ int http_parse_request_headers(HttpRequest* req) {
 
         case PARSE_HEADERS_VALUE:
             switch (ch) {
-            case ' ':
-                req->set_headers_value(std::string(start, p));
-                start = p + 1;
-                state = PARSE_LAST_CR;
-                break;
             case CR:
                 req->set_headers_value(std::string(start, p));
                 start = p + 1;
