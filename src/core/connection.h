@@ -41,9 +41,6 @@ public:
     bool is_eof() const { return eof; }
     void set_eof(bool e) { eof = e; }
 
-    bool is_error() const { return error; }
-    void set_error(bool e) { error = e; }
-
     bool is_timeout() const { return timeout; }
 
     void handle() { handler(this); }
@@ -60,7 +57,6 @@ private:
     uint32_t ready:1;
     uint32_t timeout:1;
     uint32_t eof:1;
-    uint32_t error:1;
     uint64_t timer;
     std::function<void(Event*)> handler;
 };
@@ -107,7 +103,11 @@ public:
     bool is_timeout() const { return timeout; }
     void set_timeout(bool t) { timeout = t; }
 
-    int recv_data();
+    bool is_error() const { return error; }
+    void set_error(bool e) { error = e; }
+
+    int recv_data() { return recv_data(recv_buf.get()); }
+    int recv_data(Buffer* buf);
     int send_data(char* data, int size);
     int send_chain(std::list<Buffer>& chain);
     int send_file(File* file);
@@ -121,8 +121,10 @@ private:
     Event write_event;
     std::unique_ptr<ConnectionContext> ctx;
     std::unique_ptr<Buffer> recv_buf;
+
     uint32_t listen:1;
     uint32_t timeout:1;
+    uint32_t error:1;
 
     static uint64_t count;
 };

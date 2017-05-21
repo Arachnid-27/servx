@@ -23,7 +23,7 @@ void HttpPhaseRunner::run(HttpRequest* req) {
             continue;
         }
 
-        if (vec.size() < req->get_phase_index() + 1) {
+        if (vec.size() <= req->get_phase_index()) {
             Logger::instance()->info("all %d phase handler deny!", phase);
             req->finalize(HTTP_FORBIDDEN);
             return;
@@ -82,6 +82,11 @@ int HttpPhaseRunner::content_phase_checker(HttpRequest* req) {
 
     Logger::instance()->debug("content phase checker get %d", rc);
 
+    if (rc == SERVX_AGAIN) {
+        // set http_write
+        return SERVX_OK;
+    }
+
     if (rc != SERVX_DENY) {
         req->finalize(rc);
         return SERVX_OK;
@@ -108,11 +113,11 @@ int HttpPhaseRunner::find_config_handler(HttpRequest* req) {
         return HTTP_NOT_FOUND;
     }
 
-    if (req->get_content_length() > 0 &&
-        loc->get_client_max_body_size() <
-        static_cast<uint32_t>(req->get_content_length())) {
-        Logger::instance()->warn("client body too large, %d bytes in tatol",
-            req->get_content_length());
+    long len = req->get_request_body()->get_content_length();
+    if (len > 0 &&
+        loc->get_client_max_body_size() < static_cast<uint32_t>(len)) {
+        Logger::instance()->warn(
+            "client body too large, %d bytes in tatol", len);
         return HTTP_REQUEST_ENTITY_TOO_LARGE;
     }
 

@@ -77,6 +77,7 @@ int HttpResponse::send_header() {
 
     n = sprintf(pos, "Date:%s\r\n",
                 Clock::instance()->get_current_http_time().c_str());
+    pos += n;
 
     if (content_length != -1) {
         n = sprintf(pos, "Content-Length:%ld\r\n", content_length);
@@ -181,7 +182,6 @@ int HttpResponse::send() {
         Sendable &sa = out.front();
 
         if (!sa.chain.empty()) {
-            Logger::instance()->debug("send chain %d", sa.chain.back().get_size());
             rc = conn->send_chain(sa.chain);
             if (rc == SERVX_ERROR) {
                 return SERVX_ERROR;
@@ -209,26 +209,30 @@ int HttpResponse::send() {
                     if (!(*iter)->file_status()) {
                         return SERVX_ERROR;
                     }
+
                     size = (*iter)->get_file_size() -
                         (*iter)->get_read_offset();
 
-                    if (size == 0) {
-                        iter = sa.files.erase(iter);
-                        continue;
-                    }
-
-                    Logger::instance()->debug("copy %d bytes...", size);
-
-                    Logger::instance()->debug("%p", &sa);
-                    sa.chain.emplace_back(size);
-                    rc = io_recv((*iter)->get_fd(), &sa.chain.back());
-
-                    if (rc == SERVX_ERROR || rc == SERVX_DONE) {
+                    if (size < 0) {
                         return SERVX_ERROR;
                     }
 
-                    if (rc != SERVX_OK) {
-                        break;
+                    if (size > 0) {
+                        Logger::instance()->debug("copy %d bytes...", size);
+
+                        sa.chain.emplace_back(size);
+                        rc = io_recv((*iter)->get_fd(), &sa.chain.back());
+
+                        if (rc == SERVX_ERROR || rc == SERVX_DONE) {
+                            return SERVX_ERROR;
+                        }
+
+                        if (rc != SERVX_OK) {
+                            if (sa.chain.empty()) {
+                                return SERVX_AGAIN;
+                            }
+                            break;
+                        }
                     }
 
                     iter = sa.files.erase(iter);

@@ -12,10 +12,6 @@ int io_recv(int fd, Buffer* buf) {
     int size = buf->get_remain();
     char *pos = buf->get_last();
 
-    if (size == 0) {
-        return SERVX_DENY;
-    }
-
     // Todo EPOLLRDHUP
 
     while (true) {

@@ -29,6 +29,7 @@ public:
     uint32_t get_capacity() const { return end - start; }
     uint32_t get_remain() const { return end - last; }
 
+    void reset() { pos = last = start; }
     void shrink();
     void enlarge(uint32_t cap);
 

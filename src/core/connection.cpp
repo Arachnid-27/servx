@@ -89,18 +89,17 @@ void Connection::init_recv_buf(int sz) {
     recv_buf = std::unique_ptr<Buffer>(new Buffer(sz));
 }
 
-int Connection::recv_data() {
-    int rc = io_recv(socket_fd, recv_buf.get());
+int Connection::recv_data(Buffer* buf) {
+    int rc = io_recv(socket_fd, buf);
 
     switch (rc) {
     case SERVX_OK:
-    case SERVX_DENY:
         return rc;
     case SERVX_DONE:
         read_event.set_eof(true);
         break;
     case SERVX_ERROR:
-        read_event.set_error(true);
+        error = 1;
         break;
     }
 
@@ -122,7 +121,7 @@ int Connection::send_data(char* data, int size) {
     case SERVX_OK:
         break;
     case SERVX_ERROR:
-        write_event.set_error(true);
+        error = 1;
         // fall
     default:
         write_event.set_ready(false);
@@ -140,7 +139,7 @@ int Connection::send_chain(std::list<Buffer>& chain) {
 
         if (rc == SERVX_ERROR) {
             write_event.set_ready(false);
-            write_event.set_error(true);
+            error = 1;
             return SERVX_ERROR;
         }
 
@@ -178,7 +177,7 @@ int Connection::send_file(File* file) {
     }
 
     if (rc == SERVX_ERROR) {
-        write_event.set_error(true);
+        error = 1;
     }
 
     write_event.set_ready(false);

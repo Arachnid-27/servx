@@ -40,8 +40,8 @@ int HttpStaticModule::http_static_handler(HttpRequest* req) {
         std::unique_ptr<File>(new File(std::move(path)));
 
     if (!file->open(O_RDONLY | O_NONBLOCK)) {
-        Logger::instance()->warn("open %s failed, %d",
-            file->get_pathname().c_str(), errno);
+        Logger::instance()->warn("open %s failed",
+            file->get_pathname().c_str());
         return HTTP_NOT_FOUND;
     }
 
@@ -67,7 +67,7 @@ int HttpStaticModule::http_static_handler(HttpRequest* req) {
         return HTTP_NOT_FOUND;
     }
 
-    if (!req->discard_request_body()) {
+    if (req->get_request_body()->discard() != SERVX_OK) {
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 

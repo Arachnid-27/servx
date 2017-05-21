@@ -5,6 +5,8 @@
 #define LF      '\n'
 #define CRLF    "\r\n"
 
+#include "connection.h"
+
 namespace servx {
 
 enum HttpPhase {
@@ -54,6 +56,9 @@ enum HttpStateCode {
     HTTP_SERVICE_UNAVAILABLE,       // 503
     HTTP_GATEWAY_TIME_OUT           // 504
 };
+
+void http_empty_read_handler(Event*);
+void http_empty_write_handler(Event*);
 
 }
 

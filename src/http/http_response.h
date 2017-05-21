@@ -5,7 +5,6 @@
 #include <memory>
 #include <unordered_map>
 
-#include "connection.h"
 #include "file.h"
 #include "http.h"
 #include "location.h"

@@ -5,10 +5,13 @@
 
 #include "connection.h"
 #include "http.h"
+#include "http_request_body.h"
 #include "http_response.h"
 #include "server.h"
 
 namespace servx {
+
+class HttpRequestBody;
 
 class HttpRequest {
 public:
@@ -52,6 +55,8 @@ public:
     int get_parse_state() const { return parse_state; }
     void set_parse_state(int state) { parse_state = state; }
 
+    Connection* get_connection() const { return conn; }
+
     Buffer* get_recv_buf() const { return conn->get_recv_buf(); }
 
     int get_buf_offset() const { return buf_offset; }
@@ -66,16 +71,8 @@ public:
     bool is_quoted() const { return quoted; }
     void set_quoted(bool q) { quoted = q; }
 
-    bool is_chunked() const { return chunked; }
-    void set_chunked(bool c) { chunked = c; }
-
     bool is_keep_alive() const { return keep_alive; }
     void set_keep_alive(bool k) { keep_alive = k; }
-
-    long get_content_length() const { return content_length; }
-    void set_content_length(long n) { content_length = n; }
-
-    bool is_lingering_close() const { return content_length > 0 || chunked; }
 
     void set_headers_name(std::string&& s) { name = std::move(s); }
     void set_headers_value(std::string&& s);
@@ -91,30 +88,25 @@ public:
     http_phase_handler_t get_content_handler() { return content_handler; }
     void get_content_handler(const http_phase_handler_t& h);
 
-    bool is_discard_body() const { return discard_body; }
-    bool discard_request_body();
-
-    bool is_expect_tested() const { return expect_tested; }
-    bool test_expect();
-
-    HttpResponse* get_response() const { return response.get(); }
+    HttpResponse* get_response() { return response.get(); }
+    HttpRequestBody* get_request_body() { return body.get(); }
 
     int read_request_header();
 
-    void finalize(int status) {}
-    void close(int status) {}
+    void finalize(int rc);
+    void close(int status);
 
 private:
     Connection *conn;
     HttpMethod http_method;
     int parse_state;
     int buf_offset;
-    long content_length;
     // void** ctx;
     http_req_handler_t read_handler;
     http_req_handler_t write_handler;
     std::unordered_map<std::string, std::string> headers;
 
+    std::unique_ptr<HttpRequestBody> body;
     std::unique_ptr<HttpResponse> response;
 
     uint32_t phase;
@@ -125,10 +117,7 @@ private:
     Location *location;
 
     uint32_t quoted:1;
-    uint32_t chunked:1;
     uint32_t keep_alive:1;
-    uint32_t discard_body:1;
-    uint32_t expect_tested:1;
 
     std::string name;
 
@@ -170,9 +159,9 @@ void http_wait_request_handler(Event* ev);
 
 void http_empty_handler(Event* ev);
 
-void http_init_connection(Connection* conn);
-
 void http_block_reading(HttpRequest* req);
+
+void http_init_connection(Connection* conn);
 
 void http_process_request_line(Event* ev);
 

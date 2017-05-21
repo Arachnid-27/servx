@@ -15,10 +15,11 @@ namespace servx {
 
 HttpRequest::HttpRequest(Connection* c)
     : conn(c), http_method(HTTP_METHOD_UNKONWN), parse_state(0),
-      buf_offset(0), content_length(-1), response(new HttpResponse(c)),
+      buf_offset(0), body(new HttpRequestBody(this)),
+      response(new HttpResponse(c)),
       phase(HTTP_POST_READ_PHASE), phase_index(0),
       content_handler(nullptr), server(nullptr),
-      quoted(false), chunked(false), keep_alive(false) {
+      quoted(false), keep_alive(false) {
 }
 
 std::string HttpRequest::get_headers(const char* s) const {
@@ -29,74 +30,26 @@ std::string HttpRequest::get_headers(const char* s) const {
     return iter->second;
 }
 
-bool HttpRequest::discard_request_body() {
-    if (discard_body) {
-        return true;
-    }
-
-    if (!test_expect()) {
-        return false;
-    }
-
-    // TODO: recv data && set event handler
-
-    discard_body = 1;
-
-    return true;
-}
-
-bool HttpRequest::test_expect() {
-    if (expect_tested) {
-        return true;
-    }
-
-    auto expect = headers.find("expect");
-    if (expect == headers.end()) {
-        return true;
-    }
-
-    expect_tested = 1;
-
-    if (expect->second != "100-continue") {
-        return true;
-    }
-
-    static char response[] = "HTTP/1.1 100 Continue\r\n\r\n";
-    if (conn->send_data(response, sizeof(response) - 1) == SERVX_OK) {
-        return true;
-    }
-
-    // connection error
-
-    return false;
-}
-
 int HttpRequest::read_request_header() {
     Event *ev = conn->get_read_event();
 
     if (ev->is_ready()) {
         while (true) {
-            int rc = conn->recv_data();
-
-            switch (rc) {
-            case SERVX_DENY:
+            if (get_recv_buf()->get_remain() == 0) {
                 if (get_recv_buf()->get_size() == 8192) {
                     Logger::instance()->info("request too large");
                     finalize(HTTP_BAD_REQUEST);
                     return SERVX_ERROR;
-                } else {
-                    get_recv_buf()->enlarge(8192);
                 }
-                break;
+                get_recv_buf()->enlarge(8192);
+            }
+
+            int rc = conn->recv_data();
+
+            switch (rc) {
             case SERVX_AGAIN:
                 if (!ev->is_timer()) {
                     Timer::instance()->add_timer(ev, 60000);
-                }
-                if (!ev->is_active()) {
-                    if (!add_event(ev, 0)) {
-                        close(HTTP_INTERNAL_SERVER_ERROR);
-                        return SERVX_ERROR;
-                    }
                 }
                 return SERVX_AGAIN;
             case SERVX_DONE:
@@ -110,6 +63,40 @@ int HttpRequest::read_request_header() {
     }
 
     return SERVX_AGAIN;
+}
+
+void HttpRequest::finalize(int rc) {
+    Logger::instance()->debug("http finalize, rc = %d", rc);
+
+    if (rc == SERVX_OK) {
+        if (!keep_alive) {
+            conn->close();
+            return;
+        }
+        Timer::instance()->add_timer(conn->get_read_event(), 120000);
+        conn->get_read_event()->set_ready(false);
+        conn->get_read_event()->set_handler(http_wait_request_handler);
+        conn->get_write_event()->set_handler(http_empty_write_handler);
+        return;
+    }
+
+    if (rc == SERVX_AGAIN) {
+        return;
+    }
+
+    if (rc < 10) {
+        rc = HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    close(rc);
+}
+
+void HttpRequest::close(int status) {
+    response->set_content_length(0);
+    response->set_status(status);
+    response->send_header();
+    // TODO: linger close
+    conn->close();
 }
 
 void http_request_handler(Event* ev) {
@@ -149,11 +136,6 @@ void http_wait_request_handler(Event* ev) {
             Timer::instance()->add_timer(ev, 60000);
         }
         ConnectionPool::instance()->enable_reusable(conn);
-        if (!ev->is_active()) {
-            if (!add_event(ev, 0)) {
-                conn->close();
-            }
-        }
         return;
     case SERVX_DONE:
         Logger::instance()->info("client closed connection");
@@ -226,13 +208,14 @@ void http_process_request_headers(Event* ev) {
                     req->finalize(HTTP_BAD_REQUEST);
                     return;
                 }
-                req->set_content_length(n);
+                req->get_request_body()->set_content_length(n);
             }
 
             auto encoding = req->get_headers("transfer-encoding");
-            if (encoding == "chunked") {
-                req->set_chunked(true);
-            } else if (!encoding.empty() && encoding != "identity") {
+/*          if (encoding == "chunked") {
+                req->get_request_body()->set_chunked(true);
+            } else */
+            if (!encoding.empty() && encoding != "identity") {
                 Logger::instance()->error("unknown encoding %s",
                                           encoding.c_str());
                 req->finalize(HTTP_NOT_IMPLEMENTED);
@@ -241,6 +224,10 @@ void http_process_request_headers(Event* ev) {
 
             auto connection = req->get_headers("connection");
             if (connection == "keep-alive") {
+                if (length.empty()/* && encoding != "chunked" */) {
+                    req->finalize(HTTP_BAD_REQUEST);
+                    return;
+                }
                 Logger::instance()->debug("connection keep-alive");
                 req->set_keep_alive(true);
                 req->get_response()->set_keep_alive(true);

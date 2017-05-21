@@ -65,7 +65,7 @@ void accept_event_handler(Listening* lst, Event* ev) {
             if (err == EMFILE || err == ENFILE) {
                 if (Listener::instance()->disable_all()) {
                     Logger::instance()->info("disable all listening fd");
-                    Timer::instance()->add_timer(ev, 500);
+                    Timer::instance()->add_timer(ev, 1000);
                 }
             }
 
