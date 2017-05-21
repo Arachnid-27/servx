@@ -43,7 +43,7 @@ inline bool Server::contain_server_name(const std::string& name) const {
 
 class HttpServers: public ListeningServers {
 public:
-    HttpServers() = default;
+    HttpServers(): default_server(nullptr) {}
 
     HttpServers(const Server&) = delete;
     HttpServers(Server&&) = delete;

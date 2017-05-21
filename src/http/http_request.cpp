@@ -38,7 +38,7 @@ bool HttpRequest::discard_request_body() {
         return false;
     }
 
-    // Todo recv data && set event handler
+    // TODO: recv data && set event handler
 
     discard_body = 1;
 
@@ -73,58 +73,50 @@ bool HttpRequest::test_expect() {
 
 int HttpRequest::read_request_header() {
     Event *ev = conn->get_read_event();
-    int rc = SERVX_NOT_READY;
 
     if (ev->is_ready()) {
         while (true) {
-            rc = conn->recv_data();
+            int rc = conn->recv_data();
 
-            if (rc == SERVX_DENY) {
+            switch (rc) {
+            case SERVX_DENY:
                 if (get_recv_buf()->get_size() == 8192) {
                     Logger::instance()->info("request too large");
                     finalize(HTTP_BAD_REQUEST);
+                    return SERVX_ERROR;
                 } else {
                     get_recv_buf()->enlarge(8192);
-                    continue;
                 }
-            }
-
-            if (rc == SERVX_NOT_READY) {
                 break;
-            }
-
-            if (rc == SERVX_DONE) {
+            case SERVX_AGAIN:
+                if (!ev->is_timer()) {
+                    Timer::instance()->add_timer(ev, 60000);
+                }
+                if (!ev->is_active()) {
+                    if (!add_event(ev, 0)) {
+                        close(HTTP_INTERNAL_SERVER_ERROR);
+                        return SERVX_ERROR;
+                    }
+                }
+                return SERVX_AGAIN;
+            case SERVX_DONE:
                 Logger::instance()->info("client prematurely closed connection");
+                // fall
+            case SERVX_ERROR:
                 finalize(HTTP_BAD_REQUEST);
+                return SERVX_ERROR;
             }
-
-            if (rc == SERVX_ERROR) {
-                finalize(HTTP_BAD_REQUEST);
-            }
-
-            return rc;
         }
     }
 
-    if (!ev->is_timer()) {
-        Timer::instance()->add_timer(ev, 60000);
-    }
-
-    if (!ev->is_active()) {
-        if (!add_event(ev, 0)) {
-            close(HTTP_INTERNAL_SERVER_ERROR);
-            return SERVX_ERROR;
-        }
-    }
-
-    return rc;
+    return SERVX_AGAIN;
 }
 
 void http_request_handler(Event* ev) {
     HttpRequest *req = ev->get_connection()->
         get_context<HttpConnection>()->get_request();
 
-    // Todo cancel dalay
+    // TODO: cancel dalay
 
     if (ev->is_write_event()) {
         req->handle_write();
@@ -132,7 +124,7 @@ void http_request_handler(Event* ev) {
         req->handle_read();
     }
 
-    // Todo process subrequest
+    // TODO: process subrequest
 }
 
 void http_wait_request_handler(Event* ev) {
@@ -143,7 +135,7 @@ void http_wait_request_handler(Event* ev) {
     }
 
     if (conn->get_recv_buf() == nullptr) {
-        // Todo custom the size of recv buffer
+        // TODO: custom the size of recv buffer
         conn->init_recv_buf(4096);
     }
 
@@ -151,30 +143,22 @@ void http_wait_request_handler(Event* ev) {
 
     int rc = conn->recv_data();
 
-    if (rc == SERVX_ERROR) {
-        conn->close();
-        return;
-    }
-
-    if (rc == SERVX_NOT_READY) {
+    switch (rc) {
+    case SERVX_AGAIN:
         if (!ev->is_timer()) {
             Timer::instance()->add_timer(ev, 60000);
         }
         ConnectionPool::instance()->enable_reusable(conn);
-
         if (!ev->is_active()) {
             if (!add_event(ev, 0)) {
                 conn->close();
-                return;
             }
         }
-
         return;
-    }
-
-    if (rc == SERVX_DONE) {
-        // first time recv 0 byte
+    case SERVX_DONE:
         Logger::instance()->info("client closed connection");
+        // fall
+    case SERVX_ERROR:
         conn->close();
         return;
     }
@@ -189,7 +173,6 @@ void http_wait_request_handler(Event* ev) {
 
     Logger::instance()->debug("prepare to process request line");
 
-    // prepare to process request line
     ev->set_handler(http_process_request_line);
     ev->handle();
 }
@@ -333,7 +316,6 @@ void http_process_request_line(Event* ev) {
                 return;
             }
 
-            // handle quoted
             if (req->is_quoted()) {
                 if (http_parse_quoted(req) == SERVX_ERROR) {
                     req->finalize(HTTP_BAD_REQUEST);
@@ -341,7 +323,6 @@ void http_process_request_line(Event* ev) {
                 }
             }
 
-            // handle args
             if (!req->get_args().empty()) {
                 if (http_parse_args(req) == SERVX_ERROR) {
                     req->finalize(HTTP_BAD_REQUEST);
@@ -350,7 +331,7 @@ void http_process_request_line(Event* ev) {
             }
 
             if (!req->get_host().empty()) {
-                // Todo check host format
+                // TODO: check host format
             }
 
             ev->set_handler(http_process_request_headers);
@@ -367,7 +348,6 @@ void http_process_request_line(Event* ev) {
 }
 
 void http_init_connection(Connection* conn) {
-    // we don't add write event until we send response
     if (!add_event(conn->get_read_event(), 0)) {
         Logger::instance()->error("can not add event");
         conn->close();
@@ -394,7 +374,7 @@ void http_init_connection(Connection* conn) {
         return;
     }
 
-    // Todo custom timeout
+    // TODO: custom timeout
     Timer::instance()->add_timer(conn->get_read_event(), 60000);
     ConnectionPool::instance()->enable_reusable(conn);
 

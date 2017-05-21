@@ -3,6 +3,7 @@
 #include "http_phase.h"
 #include "module_manager.h"
 #include "listener.h"
+#include "logger.h"
 
 namespace servx {
 
@@ -23,6 +24,7 @@ int MainHttpModule::location_handler(command_vals_t v) {
 
     loc = new Location(v[0]);
     if (!conf.servers.back()->push_location(loc, false)) {
+        Logger::instance()->error("location %s duplicate", v[0].c_str());
         return ERROR_COMMAND;
     }
 
@@ -30,17 +32,19 @@ int MainHttpModule::location_handler(command_vals_t v) {
 }
 
 int MainHttpModule::address_handler(command_vals_t v) {
+    addr = "*";
+    port = "80";
+    default_server = false;
+
     if (v.size() != 0) {
         if (v.size() == 1 && v[0] == "default") {
             default_server = true;
         } else {
+            Logger::instance()->error("can not parse %s", v[0].c_str());
             return ERROR_COMMAND;
         }
     }
 
-    addr = "*";
-    port = "80";
-    default_server = false;
     tcp_socket = std::make_shared<TcpSocket>();
     return ADDRESS_BLOCK;
 }

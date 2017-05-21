@@ -76,7 +76,7 @@ int HttpStaticModule::http_static_handler(HttpRequest* req) {
     resp->set_last_modified_time(file->get_modify_time());
     resp->set_etag(true);
 
-    // Todo set content_type
+    // TODO: set content_type
 
     Logger::instance()->debug("prepare to send header...");
 

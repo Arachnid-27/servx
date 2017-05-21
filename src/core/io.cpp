@@ -37,7 +37,7 @@ int io_recv(int fd, Buffer* buf) {
         }
 
         if (err == EAGAIN) {
-            return SERVX_NOT_READY;
+            return SERVX_AGAIN;
         }
 
         return SERVX_ERROR;
@@ -63,7 +63,7 @@ int io_send(int fd, Buffer* buf) {
         }
 
         if (err == EAGAIN) {
-            return SERVX_NOT_READY;
+            return SERVX_AGAIN;
         }
 
         return SERVX_ERROR;
@@ -120,7 +120,7 @@ int io_send_chain(int fd, std::list<Buffer>& chain) {
         }
 
         if (err == EAGAIN) {
-            return SERVX_NOT_READY;
+            return SERVX_AGAIN;
         }
 
         return SERVX_ERROR;

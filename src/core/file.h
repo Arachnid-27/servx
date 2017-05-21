@@ -12,7 +12,7 @@ namespace servx {
 
 class File {
 public:
-    File(int f): fd(f), offset(0) {}
+    File(int f): fd(f), offset(0), read_offset(0) {}
 
     File(const std::string& s): offset(0), pathname(s) {}
     File(std::string&& s): offset(0), pathname(std::move(s)) {}
@@ -30,9 +30,11 @@ public:
     bool open(int flags);
     bool open(int flags, mode_t mode);
 
-    int read(char* buf, int count) { return ::read(fd, buf, count); }
-    int write(char* buf, int count) { return ::write(fd, buf, count); }
+    int read(char* buf, int count);
+    int write(char* buf, int count);
     int send(int out_fd, int count);
+
+    int get_fd() const { return fd; }
 
     bool file_status();
 
@@ -45,9 +47,12 @@ public:
     long get_offset() const { return offset; }
     void set_offset(long n) { offset = n; }
 
+    long get_read_offset() const { return read_offset; }
+
 private:
     int fd;
     long offset;
+    long read_offset;
     std::string pathname;
     std::unique_ptr<struct stat> info;
 };

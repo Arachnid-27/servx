@@ -46,15 +46,61 @@ int File::send(int out_fd, int count) {
 
         int err = errno;
 
-        if (err == EINTR) {
-            continue;
+        switch (err) {
+        case EINTR:
+            break;
+        case EAGAIN:
+            return SERVX_AGAIN;
+        default:
+            return SERVX_ERROR;
+        }
+    }
+}
+
+int File::read(char* buf, int count) {
+    while (true) {
+        int n = ::read(fd, buf, count);
+
+        if (n > 0) {
+            read_offset += n;
+            return n < count ? SERVX_PARTIAL : SERVX_OK;
         }
 
-        if (err == EAGAIN) {
-            return SERVX_NOT_READY;
+        if (n == 0) {
+            return SERVX_DONE;
         }
 
-        return SERVX_ERROR;
+        int err = errno;
+
+        switch (err) {
+        case EINTR:
+            break;
+        case EAGAIN:
+            return SERVX_AGAIN;
+        default:
+            return SERVX_ERROR;
+        }
+    }
+}
+
+int File::write(char* buf, int count) {
+    while (true) {
+        int n = ::write(fd, buf, count);
+
+        if (n >= 0) {
+            return n < count ? SERVX_PARTIAL : SERVX_OK;
+        }
+
+        int err = errno;
+
+        switch (err) {
+        case EINTR:
+            break;
+        case EAGAIN:
+            return SERVX_AGAIN;
+        default:
+            return SERVX_ERROR;
+        }
     }
 }
 

@@ -9,7 +9,6 @@ enum ResultCode {
     SERVX_ERROR,
     SERVX_PARTIAL,
     SERVX_DONE,
-    SERVX_NOT_READY,
     SERVX_DENY
 };
 

@@ -175,12 +175,13 @@ int HttpResponse::send_body(std::list<Buffer>&& chain) {
 }
 
 int HttpResponse::send() {
-    int rc = SERVX_OK;
+    int rc;
 
     while (!out.empty()) {
         Sendable &sa = out.front();
 
         if (!sa.chain.empty()) {
+            Logger::instance()->debug("send chain %d", sa.chain.back().get_size());
             rc = conn->send_chain(sa.chain);
             if (rc == SERVX_ERROR) {
                 return SERVX_ERROR;
@@ -202,21 +203,44 @@ int HttpResponse::send() {
                     }
                 }
             } else {
-                for (auto &f : sa.files) {
-                    if (!f->file_status()) {
+                int size;
+                auto iter = sa.files.begin();
+                while (iter != sa.files.end()) {
+                    if (!(*iter)->file_status()) {
                         return SERVX_ERROR;
                     }
-                    sa.chain.emplace_back(f->get_file_size());
-                    // TODO: the result of read
-                    f->read(sa.chain.back().get_pos(), f->get_file_size());
+                    size = (*iter)->get_file_size() -
+                        (*iter)->get_read_offset();
+
+                    if (size == 0) {
+                        iter = sa.files.erase(iter);
+                        continue;
+                    }
+
+                    Logger::instance()->debug("copy %d bytes...", size);
+
+                    Logger::instance()->debug("%p", &sa);
+                    sa.chain.emplace_back(size);
+                    rc = io_recv((*iter)->get_fd(), &sa.chain.back());
+
+                    if (rc == SERVX_ERROR || rc == SERVX_DONE) {
+                        return SERVX_ERROR;
+                    }
+
+                    if (rc != SERVX_OK) {
+                        break;
+                    }
+
+                    iter = sa.files.erase(iter);
                 }
-                sa.files.clear();
                 continue;
             }
         }
 
         out.pop_front();
     }
+
+    Logger::instance()->debug("send response success!");
 
     return SERVX_OK;
 }

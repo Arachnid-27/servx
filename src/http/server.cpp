@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "module_manager.h"
+#include "logger.h"
 
 namespace servx {
 
@@ -26,7 +27,7 @@ bool Server::push_location(Location* loc, bool regex) {
 }
 
 Location* Server::find_location(const std::string& uri) {
-    // Todo regex_locations
+    // TODO: regex_locations
 
     return prefix_locations.find(uri);
 }
@@ -34,6 +35,7 @@ Location* Server::find_location(const std::string& uri) {
 bool HttpServers::push_server(Server* srv, bool def) {
     if (def) {
         if (default_server != nullptr) {
+            Logger::instance()->error("default server exists!");
             return false;
         }
         default_server = srv;

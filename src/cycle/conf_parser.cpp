@@ -1,5 +1,6 @@
 #include "conf_parser.h"
 
+#include "core.h"
 #include "logger.h"
 #include "module_manager.h"
 
@@ -141,16 +142,22 @@ bool ConfParser::parse_value(ConfItem* item) {
 }
 
 int ConfParser::next_token() {
+    int rc;
     char ch;
     uint16_t len = 0;
 
     while (1) {
-        // Todo return -1
-        if (conf_file->read(&ch, 1) == 0) {
-            if (len != 0) {
-                return STATE_ERROR;
+        rc = conf_file->read(&ch, 1);
+        switch (rc) {
+        case SERVX_OK:
+            break;
+        case SERVX_DONE:
+            if (len == 0) {
+                return STATE_FINISTH;
             }
-            return STATE_FINISTH;
+            // fall
+        default:
+            return STATE_ERROR;
         }
 
         switch (ch) {

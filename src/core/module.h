@@ -15,7 +15,7 @@
         [this](command_vals_t v) { return this->handler(v); }
 
 #define lambda_post_handler(handler)                            \
-        [this]() { return this-handler(); }
+        [this]() { return this->handler(); }
 
 namespace servx {
 
