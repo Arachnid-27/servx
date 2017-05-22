@@ -24,7 +24,6 @@ public:
     ~HttpRequestBody() = default;
 
     int read(const http_req_handler_t& h);
-    int read();
     int discard();
 
     long get_content_length() const { return content_length; }
@@ -34,11 +33,17 @@ public:
     void set_chunked(bool c) { chunked = c; }
 
     static void read_request_body_handler(HttpRequest* req);
+    static void discard_request_body_handler(HttpRequest* req);
 
 private:
+    int handle_read();
+    int handle_discard();
+
     HttpRequest *req;
     std::list<Buffer> body;
     http_req_handler_t handler;
+
+    std::unique_ptr<Buffer> discard_buffer;
 
     uint32_t discarded:1;
     uint32_t chunked:1;

@@ -35,45 +35,49 @@ int HttpRequestBody::read(const http_req_handler_t& h) {
     }
 
     req->set_read_handler(read_request_body_handler);
-    return read();
+    return handle_read();
 }
 
-int HttpRequestBody::read() {
+int HttpRequestBody::handle_read() {
     Connection *conn = req->get_connection();
     int rc, size;
 
     while (true) {
-        Buffer *buf = &body.back();
+        Buffer &buf = body.back();
 
-        if (buf->get_remain() == 0) {
-            size = content_length - recv;
-            body.emplace_back(size >= 4096 ? 4096 : size);
-            buf = &body.back();
+        size = buf.get_remain() > content_length - recv ?
+            content_length - recv : buf.get_remain();
+        rc = conn->recv_data(&buf, size);
+
+        if (rc == SERVX_ERROR) {
+            return SERVX_ERROR;
         }
 
-        size = buf->get_size();
-        rc = conn->recv_data(buf);
-        recv += (buf->get_size() - size);
-
-        switch (rc) {
-        case SERVX_AGAIN:
-        case SERVX_PARTIAL:
+        if (rc == SERVX_AGAIN) {
             if (!conn->get_read_event()->is_timer()) {
                 Timer::instance()->add_timer(conn->get_read_event(), 60000);
             }
             return SERVX_AGAIN;
-        case SERVX_ERROR:
-            return SERVX_ERROR;
         }
 
+        buf.set_last(buf.get_pos() + rc);
+        recv += rc;
         if (recv == content_length) {
+            handler(req);
             return SERVX_OK;
+        } else if (buf.get_remain() == 0) {
+            body.emplace_back(4096);
+        } else {
+            if (!conn->get_read_event()->is_timer()) {
+                Timer::instance()->add_timer(conn->get_read_event(), 60000);
+            }
+            return SERVX_AGAIN;
         }
     }
 }
 
 int HttpRequestBody::discard() {
-    if (discarded) {
+    if (discard_buffer != nullptr) {
         return SERVX_OK;
     }
 
@@ -86,11 +90,47 @@ int HttpRequestBody::discard() {
         return SERVX_OK;
     }
 
-    // TODO: recv data && set event handler
+    discard_buffer = std::unique_ptr<Buffer>(new Buffer(1024));
+    int rc = handle_discard();
 
-    discarded = 1;
+    if (rc == SERVX_ERROR) {
+        return SERVX_ERROR;
+    }
 
     return SERVX_OK;
+}
+
+int HttpRequestBody::handle_discard() {
+    Connection *conn = req->get_connection();
+    int rc;
+
+    while (true) {
+        rc = conn->recv_data(discard_buffer.get(), 1024);
+        discard_buffer->reset();
+
+        if (rc < 0) {
+            return rc;
+        }
+
+        recv += rc;
+        if (recv == content_length) {
+            discard_buffer = nullptr;
+            discarded = 1;
+            return SERVX_OK;
+        }
+
+        if (rc != 1024) {
+            return SERVX_AGAIN;
+        }
+    }
+}
+
+void HttpRequestBody::discard_request_body_handler(HttpRequest* req) {
+    int rc = req->get_request_body()->handle_discard();
+
+    if (rc == SERVX_ERROR) {
+        req->finalize(SERVX_ERROR);
+    }
 }
 
 void HttpRequestBody::read_request_body_handler(HttpRequest* req) {
@@ -99,7 +139,7 @@ void HttpRequestBody::read_request_body_handler(HttpRequest* req) {
         req->finalize(HTTP_REQUEST_TIME_OUT);
     }
 
-    int rc = req->get_request_body()->read();
+    int rc = req->get_request_body()->handle_read();
 
     if (rc == SERVX_ERROR) {
         req->finalize(SERVX_ERROR);

@@ -7,12 +7,14 @@
 #include "logger.h"
 #include "listener.h"
 #include "module_manager.h"
+#include "timer.h"
 
 namespace servx {
 
 void worker_process_cycle() {
     auto manager = ModuleManager::instance();
 
+    Logger::instance()->update_pid();
     Clock::instance()->update();
 
     if (!manager->for_each([](Module* m) { return m->init_process(); })) {
@@ -26,6 +28,10 @@ void worker_process_cycle() {
 
     while (true) {
         process_event();
+
+        Logger::instance()->debug("call expire_timer()");
+
+        Timer::instance()->expire_timer();
     }
 }
 

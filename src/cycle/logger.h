@@ -39,6 +39,8 @@ public:
     void error(const char* fmt, ...) { log_with_level("error"); }
     void alert(const char* fmt, ...) { log_with_level("alert"); }
 
+    void update_pid() { pid = getpid(); }
+
     void push_file(const std::string& s) { files.emplace_back(s); }
 
     void open_files();
@@ -46,14 +48,13 @@ public:
     static Logger* instance() { return logger; }
 
 private:
-    Logger(): pid(getpid()), std_err(STDERR_FILENO), open(false) {}
+    Logger(): pid(getpid()), open(false) {}
 
     void log(const char* level, const char* fmt, va_list args);
 
     // Todo signal-safe stack buffer
     char buf[1024];
     pid_t pid;
-    File std_err;
     std::vector<File> files;
     bool open;
 

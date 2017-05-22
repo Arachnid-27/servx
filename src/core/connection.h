@@ -106,9 +106,8 @@ public:
     bool is_error() const { return error; }
     void set_error(bool e) { error = e; }
 
-    int recv_data() { return recv_data(recv_buf.get()); }
-    int recv_data(Buffer* buf);
-    int send_data(char* data, int size);
+    int recv_data();
+    int recv_data(Buffer* buf, uint32_t count);
     int send_chain(std::list<Buffer>& chain);
     int send_file(File* file);
 
@@ -128,6 +127,10 @@ private:
 
     static uint64_t count;
 };
+
+inline int Connection::recv_data() {
+    return recv_data(recv_buf.get(), recv_buf->get_remain());
+}
 
 inline void Connection::set_peer_sockaddr(sockaddr* sa, socklen_t len) {
     peer_addr.set_addr(sa, len);

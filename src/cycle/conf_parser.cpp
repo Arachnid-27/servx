@@ -1,6 +1,7 @@
 #include "conf_parser.h"
 
 #include "core.h"
+#include "io.h"
 #include "logger.h"
 #include "module_manager.h"
 
@@ -147,11 +148,11 @@ int ConfParser::next_token() {
     uint16_t len = 0;
 
     while (1) {
-        rc = conf_file->read(&ch, 1);
+        rc = io_read(conf_file->get_fd(), &ch, 1);
         switch (rc) {
-        case SERVX_OK:
+        case 1:
             break;
-        case SERVX_DONE:
+        case 0:
             if (len == 0) {
                 return STATE_FINISTH;
             }

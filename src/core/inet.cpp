@@ -42,7 +42,7 @@ uint16_t get_port_from_sockaddr(const sockaddr* addr) {
 
 TcpSocket::TcpSocket()
     : send_buf(-1), recv_buf(-1),
-      backlog(5), fd(-1) {}
+      backlog(5), fd(-1), deferred_accept(false) {}
 
 TcpSocket::~TcpSocket() {
     if (fd != -1) {

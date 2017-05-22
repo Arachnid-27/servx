@@ -52,6 +52,8 @@ void Timer::expire_timer() {
 
         timer_tree.erase(it);
 
+        Logger::instance()->debug("timer expired");
+
         ev->expire();
     }
 }

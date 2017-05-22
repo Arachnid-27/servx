@@ -179,10 +179,10 @@ int HttpResponse::send() {
     int rc;
 
     while (!out.empty()) {
-        Sendable &sa = out.front();
+        auto &chain = out.front().chain;
 
-        if (!sa.chain.empty()) {
-            rc = conn->send_chain(sa.chain);
+        if (!chain.empty()) {
+            rc = conn->send_chain(chain);
             if (rc == SERVX_ERROR) {
                 return SERVX_ERROR;
             }
@@ -191,51 +191,49 @@ int HttpResponse::send() {
             }
         }
 
-        if (!sa.files.empty()) {
+        auto &files = out.front().files;
+
+        if (!files.empty()) {
             if (location->is_send_file()) {
-                for (auto &f : sa.files) {
-                    rc = conn->send_file(f.get());
+                auto iter = files.begin();
+                while (!files.empty()) {
+                    rc = conn->send_file(iter->get());
                     if (rc == SERVX_ERROR) {
                         return SERVX_ERROR;
                     }
                     if (rc != SERVX_OK) {
                         return SERVX_AGAIN;
                     }
+                    iter = files.erase(iter);
                 }
             } else {
-                int size;
-                auto iter = sa.files.begin();
-                while (iter != sa.files.end()) {
+                chain.emplace_back(1024);
+                auto iter = files.begin();
+                while (!files.empty()) {
                     if (!(*iter)->file_status()) {
                         return SERVX_ERROR;
                     }
 
-                    size = (*iter)->get_file_size() -
-                        (*iter)->get_read_offset();
+                    rc = io_read((*iter)->get_fd(), chain.back().get_last(),
+                        chain.back().get_remain());
 
-                    if (size < 0) {
-                        return SERVX_ERROR;
+                    if (rc < 0) {
+                        return rc;
                     }
 
-                    if (size > 0) {
-                        Logger::instance()->debug("copy %d bytes...", size);
+                    int bytes = (*iter)->get_offset() + rc;
+                    (*iter)->set_offset(bytes);
+                    chain.back().set_last(chain.back().get_pos() + rc);
 
-                        sa.chain.emplace_back(size);
-                        rc = io_recv((*iter)->get_fd(), &sa.chain.back());
-
-                        if (rc == SERVX_ERROR || rc == SERVX_DONE) {
-                            return SERVX_ERROR;
-                        }
-
-                        if (rc != SERVX_OK) {
-                            if (sa.chain.empty()) {
-                                return SERVX_AGAIN;
-                            }
-                            break;
-                        }
+                    if (bytes == (*iter)->get_file_size()) {
+                        iter = files.erase(iter);
+                        continue;
+                    } else if (chain.back().get_remain() == 0) {
+                        chain.emplace_back(1024);
+                        continue;
+                    } else {
+                        break;
                     }
-
-                    iter = sa.files.erase(iter);
                 }
                 continue;
             }

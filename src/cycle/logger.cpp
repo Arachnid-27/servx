@@ -3,6 +3,7 @@
 #include <cstdio>
 
 #include "clock.h"
+#include "io.h"
 
 namespace servx {
 
@@ -23,12 +24,12 @@ void Logger::log(const char* level, const char* fmt, va_list args) {
     }
 
     if (!open) {
-        std_err.write(buf, sz);
+        io_write(STDERR_FILENO, buf, sz);
         return;
     }
 
     for (auto &f : files) {
-        f.write(buf, sz);
+        io_write(f.get_fd(), buf, sz);
     }
 }
 

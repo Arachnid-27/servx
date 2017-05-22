@@ -89,75 +89,72 @@ void Connection::init_recv_buf(int sz) {
     recv_buf = std::unique_ptr<Buffer>(new Buffer(sz));
 }
 
-int Connection::recv_data(Buffer* buf) {
-    int rc = io_recv(socket_fd, buf);
+int Connection::recv_data(Buffer* buf, uint32_t count) {
+    int n = io_read(socket_fd, buf->get_last(), count);
 
-    switch (rc) {
-    case SERVX_OK:
-        return rc;
-    case SERVX_DONE:
+    if (n > 0) {
+        buf->set_last(buf->get_pos() + n);
+        if (static_cast<uint32_t>(n) < count) {
+            read_event.set_ready(false);
+        }
+        return n;
+    }
+
+    if (n == 0) {
         read_event.set_eof(true);
-        break;
-    case SERVX_ERROR:
+    } else if (n == SERVX_ERROR) {
         error = 1;
-        break;
     }
 
     read_event.set_ready(false);
-    return rc;
-}
-
-int Connection::send_data(char* data, int size) {
-    if (size < 0) {
-        return SERVX_ERROR;
-    }
-
-    Buffer buf(data, size, false);
-    int rc = io_send(socket_fd, &buf);
-
-    // TODO: record bytes the conn sent
-
-    switch (rc) {
-    case SERVX_OK:
-        break;
-    case SERVX_ERROR:
-        error = 1;
-        // fall
-    default:
-        write_event.set_ready(false);
-        break;
-    }
-
-    return rc;
+    return n;
 }
 
 int Connection::send_chain(std::list<Buffer>& chain) {
-    int rc;
+    struct iovec iovs[64];
+    int total = 0;
+    int cnt = 0;
 
-    while (true) {
-        rc = io_send_chain(socket_fd, chain);
+    while (!chain.empty()) {
+        for (auto &buf : chain) {
+            iovs[cnt].iov_base = static_cast<void*>(buf.get_pos());
+            iovs[cnt].iov_len = buf.get_size();
+            total += buf.get_size();
+            if (++cnt == 64) {
+                break;
+            }
+        }
 
-        if (rc == SERVX_ERROR) {
-            write_event.set_ready(false);
+        int n = io_write_chain(socket_fd, iovs, cnt);
+
+        if (n > 0) {
+            auto iter = chain.begin();
+            if (n < total) {
+                uint32_t num = n;
+                while (iter != chain.end()) {
+                    if (num < iter->get_size()) {
+                        iter->set_pos(iter->get_pos() + num);
+                        break;
+                    }
+                    num -= iter->get_size();
+                    ++iter;
+                }
+                chain.erase(chain.begin(), iter);
+            } else {
+                std::advance(iter, cnt);
+                chain.erase(chain.begin(), iter);
+                continue;
+            }
+        } else if (n == SERVX_ERROR) {
             error = 1;
             return SERVX_ERROR;
         }
 
-        auto iter = chain.begin();
-        while (iter != chain.end() && iter->get_size() == 0) {
-            iter = chain.erase(iter);
-        }
-
-        if (rc == SERVX_OK) {
-            if (!chain.empty()) {
-                continue;
-            }
-            return SERVX_OK;
-        }
-
         write_event.set_ready(false);
-        return rc;
+        return SERVX_AGAIN;
     }
+
+    return SERVX_OK;
 }
 
 int Connection::send_file(File* file) {
@@ -167,21 +164,21 @@ int Connection::send_file(File* file) {
 
     // TODO: speed limit
 
-    // FIXME: file_size will be cast
-    int rc = file->send(socket_fd, file->get_file_size());
+    long offset = file->get_offset();
+    int n = io_sendfile(socket_fd, file->get_fd(), &offset,
+        file->get_file_size());
+    file->set_offset(offset);
 
-    if (rc == SERVX_PARTIAL) {
-        if (file->get_offset() == file->get_file_size()) {
-            return SERVX_OK;
-        }
+    if (offset == file->get_file_size()) {
+        return SERVX_OK;
     }
 
-    if (rc == SERVX_ERROR) {
+    if (n == SERVX_ERROR) {
         error = 1;
     }
 
     write_event.set_ready(false);
-    return rc;
+    return SERVX_AGAIN;
 }
 
 }

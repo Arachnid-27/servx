@@ -34,32 +34,37 @@ int HttpRequest::read_request_header() {
     Event *ev = conn->get_read_event();
 
     if (ev->is_ready()) {
-        while (true) {
-            if (get_recv_buf()->get_remain() == 0) {
-                if (get_recv_buf()->get_size() == 8192) {
-                    Logger::instance()->info("request too large");
-                    finalize(HTTP_BAD_REQUEST);
-                    return SERVX_ERROR;
-                }
-                get_recv_buf()->enlarge(8192);
-            }
-
-            int rc = conn->recv_data();
-
-            switch (rc) {
-            case SERVX_AGAIN:
-                if (!ev->is_timer()) {
-                    Timer::instance()->add_timer(ev, 60000);
-                }
-                return SERVX_AGAIN;
-            case SERVX_DONE:
-                Logger::instance()->info("client prematurely closed connection");
-                // fall
-            case SERVX_ERROR:
+        if (get_recv_buf()->get_remain() == 0) {
+            if (get_recv_buf()->get_size() == 8192) {
+                Logger::instance()->error("request too large");
                 finalize(HTTP_BAD_REQUEST);
                 return SERVX_ERROR;
             }
+            get_recv_buf()->enlarge(8192);
         }
+
+        int n = conn->recv_data();
+
+        Logger::instance()->debug("%d", n);
+
+        if (n == 0 || n == SERVX_ERROR) {
+            if (n == 0) {
+                Logger::instance()->
+                    info("client permaturely closed connection");
+            }
+            finalize(HTTP_BAD_REQUEST);
+            return SERVX_ERROR;
+        }
+
+        if (n == SERVX_AGAIN) {
+            if (!ev->is_timer()) {
+                Timer::instance()->add_timer(ev, 60000);
+            }
+            ConnectionPool::instance()->enable_reusable(conn);
+            return SERVX_AGAIN;
+        }
+
+        return SERVX_OK;
     }
 
     return SERVX_AGAIN;
@@ -68,35 +73,41 @@ int HttpRequest::read_request_header() {
 void HttpRequest::finalize(int rc) {
     Logger::instance()->debug("http finalize, rc = %d", rc);
 
-    if (rc == SERVX_OK) {
-        if (!keep_alive) {
-            conn->close();
-            return;
-        }
-        Timer::instance()->add_timer(conn->get_read_event(), 120000);
-        conn->get_read_event()->set_ready(false);
-        conn->get_read_event()->set_handler(http_wait_request_handler);
-        conn->get_write_event()->set_handler(http_empty_write_handler);
-        return;
-    }
-
     if (rc == SERVX_AGAIN) {
         return;
     }
 
-    if (rc < 10) {
+    if (rc == SERVX_ERROR) {
         rc = HTTP_INTERNAL_SERVER_ERROR;
     }
+
+    conn->get_recv_buf()->reset();
 
     close(rc);
 }
 
 void HttpRequest::close(int status) {
-    response->set_content_length(0);
-    response->set_status(status);
-    response->send_header();
-    // TODO: linger close
-    conn->close();
+    if (status != SERVX_OK) {
+        response->set_content_length(0);
+        response->set_status(status);
+        response->send_header();
+    }
+
+    if (status == HTTP_REQUEST_TIME_OUT ||
+        conn->get_read_event()->is_eof()) {
+        return;
+    }
+
+    if (!keep_alive) {
+        // TODO: linger close
+        conn->close();
+    } else {
+        Timer::instance()->add_timer(conn->get_read_event(), 120000);
+        conn->get_read_event()->set_ready(false);
+        conn->get_read_event()->set_handler(http_wait_request_handler);
+        conn->get_write_event()->set_ready(false);
+        conn->get_write_event()->set_handler(http_empty_write_handler);
+    }
 }
 
 void http_request_handler(Event* ev) {
@@ -128,20 +139,21 @@ void http_wait_request_handler(Event* ev) {
 
     Logger::instance()->debug("recv data...");
 
-    int rc = conn->recv_data();
+    int n = conn->recv_data();
 
-    switch (rc) {
-    case SERVX_AGAIN:
+    if (n == 0 || n == SERVX_ERROR) {
+        if (n == 0) {
+            Logger::instance()->info("client closed connection");
+        }
+        conn->close();
+        return;
+    }
+
+    if (n == SERVX_AGAIN) {
         if (!ev->is_timer()) {
             Timer::instance()->add_timer(ev, 60000);
         }
         ConnectionPool::instance()->enable_reusable(conn);
-        return;
-    case SERVX_DONE:
-        Logger::instance()->info("client closed connection");
-        // fall
-    case SERVX_ERROR:
-        conn->close();
         return;
     }
 
@@ -224,10 +236,10 @@ void http_process_request_headers(Event* ev) {
 
             auto connection = req->get_headers("connection");
             if (connection == "keep-alive") {
-                if (length.empty()/* && encoding != "chunked" */) {
-                    req->finalize(HTTP_BAD_REQUEST);
-                    return;
-                }
+            //    if (length.empty() && encoding != "chunked" ) {
+            //        req->finalize(HTTP_BAD_REQUEST);
+            //        return;
+            //    }
                 Logger::instance()->debug("connection keep-alive");
                 req->set_keep_alive(true);
                 req->get_response()->set_keep_alive(true);

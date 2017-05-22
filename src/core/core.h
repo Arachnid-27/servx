@@ -4,12 +4,10 @@
 namespace servx {
 
 enum ResultCode {
-    SERVX_OK = 0,
-    SERVX_AGAIN,
-    SERVX_ERROR,
-    SERVX_PARTIAL,
-    SERVX_DONE,
-    SERVX_DENY
+    SERVX_DENY = -3,
+    SERVX_AGAIN = -2,
+    SERVX_ERROR = -1,
+    SERVX_OK = 0
 };
 
 }

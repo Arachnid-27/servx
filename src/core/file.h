@@ -12,7 +12,7 @@ namespace servx {
 
 class File {
 public:
-    File(int f): fd(f), offset(0), read_offset(0) {}
+    File(int f): fd(f), offset(0) {}
 
     File(const std::string& s): offset(0), pathname(s) {}
     File(std::string&& s): offset(0), pathname(std::move(s)) {}
@@ -30,10 +30,6 @@ public:
     bool open(int flags);
     bool open(int flags, mode_t mode);
 
-    int read(char* buf, int count);
-    int write(char* buf, int count);
-    int send(int out_fd, int count);
-
     int get_fd() const { return fd; }
 
     bool file_status();
@@ -47,12 +43,9 @@ public:
     long get_offset() const { return offset; }
     void set_offset(long n) { offset = n; }
 
-    long get_read_offset() const { return read_offset; }
-
 private:
     int fd;
     long offset;
-    long read_offset;
     std::string pathname;
     std::unique_ptr<struct stat> info;
 };
@@ -75,7 +68,7 @@ inline long File::get_modify_time() const {
     if (info == nullptr) {
         return 0;
     }
-    return info->st_mtim.tv_sec * 1000 + info->st_mtim.tv_nsec / 1000;
+    return info->st_mtim.tv_sec + info->st_mtim.tv_nsec / 1000000000;
 }
 
 inline bool operator==(const File& lhs, const File& rhs) {

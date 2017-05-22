@@ -57,7 +57,7 @@ int HttpPhaseRunner::generic_phase_checker(HttpRequest* req) {
         return SERVX_AGAIN;
     }
 
-    if (rc == SERVX_DONE) {
+    if (rc == SERVX_OK) {
         req->next_phase();
         return SERVX_AGAIN;
     }
@@ -124,7 +124,7 @@ int HttpPhaseRunner::find_config_handler(HttpRequest* req) {
     req->set_location(loc);
     req->get_response()->set_location(loc);
 
-    return SERVX_DONE;
+    return SERVX_OK;
 }
 
 }
