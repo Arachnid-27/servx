@@ -10,7 +10,7 @@ namespace servx {
 int HttpRequestBody::read(const http_req_handler_t& h) {
     handler = h;
 
-    if (content_length <= 0/* && !chunked */) {
+    if (content_length <= 0) {
         handler(req);
         return SERVX_OK;
     }
@@ -25,6 +25,7 @@ int HttpRequestBody::read(const http_req_handler_t& h) {
     }
 
     if (recv == content_length) {
+        req->set_read_handler(http_block_reading);
         handler(req);
         return SERVX_OK;
     }
@@ -60,9 +61,16 @@ int HttpRequestBody::handle_read() {
             return SERVX_AGAIN;
         }
 
+        if (rc == 0) {
+            Logger::instance()->info("client permaturely closed connection");
+            conn->get_read_event()->set_eof(true);
+            return SERVX_ERROR;
+        }
+
         buf.set_last(buf.get_pos() + rc);
         recv += rc;
         if (recv == content_length) {
+            req->set_read_handler(http_block_reading);
             handler(req);
             return SERVX_OK;
         } else if (buf.get_remain() == 0) {
@@ -86,7 +94,7 @@ int HttpRequestBody::discard() {
         Timer::instance()->del_timer(ev);
     }
 
-    if (content_length <= 0 && !chunked) {
+    if (content_length < 0) {
         return SERVX_OK;
     }
 

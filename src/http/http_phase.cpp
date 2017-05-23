@@ -115,7 +115,7 @@ int HttpPhaseRunner::find_config_handler(HttpRequest* req) {
 
     long len = req->get_request_body()->get_content_length();
     if (len > 0 &&
-        loc->get_client_max_body_size() < static_cast<uint32_t>(len)) {
+        loc->get_core_conf()->client_max_body_size < len) {
         Logger::instance()->warn(
             "client body too large, %d bytes in tatol", len);
         return HTTP_REQUEST_ENTITY_TOO_LARGE;

@@ -1,7 +1,7 @@
 #ifndef _MODULE_MANAGER_
 #define _MODULE_MANAGER_
 
-#include "http_module.h"
+#include "module.h"
 #include "modules.h"
 
 namespace servx {
@@ -27,6 +27,7 @@ private:
     void create_module(int index, Module* module);
 
     Module* modules[NULL_MODULE];
+    // TODO: use double map
     std::unordered_map<std::string, Command*> commands;
 
     static ModuleManager* manager;
@@ -40,54 +41,6 @@ template <typename T>
 inline typename T::conf_t* ModuleManager::get_conf() const {
     return static_cast<T*>(modules[T::index])->get_conf();
 }
-
-class HttpModuleManager {
-public:
-    template <typename T>
-    typename T::main_conf_t* get_main_conf() const;
-
-    template <typename T>
-    typename T::main_conf_t* get_srv_conf(Server& srv) const;
-
-    template <typename T>
-    typename T::main_conf_t* get_loc_conf(Location& loc) const;
-
-    HttpModule* get_module(int index) const;
-
-    static HttpModuleManager* instance() { return manager; }
-
-private:
-    HttpModuleManager() = default;
-
-private:
-    static HttpModuleManager* manager;
-};
-
-template <typename T>
-inline typename T::main_conf_t* HttpModuleManager::get_main_conf() const {
-    return ModuleManager::instance()->get_conf<T::main_conf_t>();
-}
-
-template <typename T>
-inline typename T::main_conf_t* HttpModuleManager::get_srv_conf(
-    Server& srv) const {
-    return static_cast<typename T::srv_conf_t*>(srv.get_conf(T::index));
-}
-
-template <typename T>
-inline typename T::main_conf_t* HttpModuleManager::get_loc_conf(
-    Location& loc) const {
-    return static_cast<typename T::srv_conf_t*>(loc.get_conf(T::index));
-}
-
-inline HttpModule* HttpModuleManager::get_module(int index) const {
-    Module *module = ModuleManager::instance()->get_module(index);
-    if (module->get_type() != HTTP_MODULE) {
-        return nullptr;
-    }
-    return reinterpret_cast<HttpModule*>(module);
-}
-
 
 }
 

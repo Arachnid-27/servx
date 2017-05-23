@@ -140,8 +140,14 @@ inline void HttpRequest::set_headers_value(std::string&& s) {
 
 class HttpConnection: public ConnectionContext {
 public:
+    HttpConnection(HttpServers* srvs): servers(srvs) {}
+
+    HttpConnection(const HttpConnection&);
+    HttpConnection(HttpConnection&&);
+    HttpConnection& operator=(const HttpConnection&);
+    HttpConnection& operator=(HttpConnection&&);
+
     HttpServers* get_servers() const { return servers; }
-    void set_servers(HttpServers* srv) { servers = srv; }
 
     HttpRequest* get_request() const { return request.get(); }
     void set_request(HttpRequest* req);
@@ -156,14 +162,12 @@ inline void HttpConnection::set_request(HttpRequest* req) {
 }
 
 void http_wait_request_handler(Event* ev);
-
-void http_empty_handler(Event* ev);
+void http_process_request_line(Event* ev);
 
 void http_block_reading(HttpRequest* req);
+void http_block_writing(HttpRequest* req);
 
 void http_init_connection(Connection* conn);
-
-void http_process_request_line(Event* ev);
 
 }
 

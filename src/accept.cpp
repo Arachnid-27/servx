@@ -25,7 +25,7 @@ void accept_event_handler(Listening* lst, Event* ev) {
         }
     }
 
-    bool multi = ModuleManager::instance()
+    bool multi_accept = ModuleManager::instance()
         ->get_conf<MainEventModule>()->multi_accept;
     Connection *conn = ev->get_connection();
 
@@ -33,7 +33,7 @@ void accept_event_handler(Listening* lst, Event* ev) {
     socklen_t len;
     int fd, err;
 
-    ev->set_ready(false);   //
+    ev->set_ready(false);
 
     Logger::instance()->debug("call accept4...");
 
@@ -45,28 +45,22 @@ void accept_event_handler(Listening* lst, Event* ev) {
         if (fd == -1) {
             err = errno;
 
-            if (err == EAGAIN) {
+            switch (err) {
+            case EAGAIN:
                 Logger::instance()->info("accept4() not ready");
-                return;
-            }
-
-            if (err == ENOSYS) {
-                // have no accept4
-                return;
-            }
-
-            if (err == ECONNABORTED) {
-                if (multi) {
+                break;
+            case ECONNABORTED:
+                if (multi_accept) {
                     continue;
                 }
-                return;
-            }
-
-            if (err == EMFILE || err == ENFILE) {
+                break;
+            case EMFILE:
+            case ENFILE:
                 if (Listener::instance()->disable_all()) {
                     Logger::instance()->info("disable all listening fd");
                     Timer::instance()->add_timer(ev, 1000);
                 }
+                break;
             }
 
             return;
@@ -80,17 +74,16 @@ void accept_event_handler(Listening* lst, Event* ev) {
             }
             return;
         }
-        new_conn->set_peer_sockaddr(&sa, len);
 
+        new_conn->set_peer_sockaddr(&sa, len);
         new_conn->get_write_event()->set_ready(true); // enable write event
         if (lst->get_socket()->is_deferred_accept()) {
             new_conn->get_read_event()->set_ready(true);
         }
 
-        Logger::instance()->debug("handle listening event");
         lst->handle(new_conn);
 
-        if (!multi) {
+        if (!multi_accept) {
             break;
         }
     }

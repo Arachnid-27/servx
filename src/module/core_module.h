@@ -11,7 +11,7 @@ protected:
     CoreModule(const std::initializer_list<Command*>& v): Module(CORE_MODULE, v) {}
 };
 
-struct MainCoreConf {
+struct MainCoreConf: public ModuleConf {
     int rlimit_nofile;
     int worker;
     bool daemon;
@@ -41,11 +41,17 @@ public:
 
     bool init_module() override;
 
-    int worker_handler(command_vals_t v);
+    int worker_handler(command_vals_t v) {
+        return set_conf_int<MainCoreConf,
+           &MainCoreConf::worker>(conf, v[0]);
+    }
 
     int daemon_handler(command_vals_t v);
 
-    int rlimit_nofile_handler(command_vals_t v);
+    int rlimit_nofile_handler(command_vals_t v) {
+        return set_conf_int<MainCoreConf,
+            &MainCoreConf::rlimit_nofile>(conf, v[0]);
+    }
 
     int error_log_handler(command_vals_t v);
 };

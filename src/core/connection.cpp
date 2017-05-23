@@ -73,8 +73,8 @@ void Connection::close() {
 
     del_connection(this);
 
-    ctx.release();
-    recv_buf.release();
+    ctx = nullptr;
+    recv_buf = nullptr;
 
     ConnectionPool::instance()->ret_connection(this);
 

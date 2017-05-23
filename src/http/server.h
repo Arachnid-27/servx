@@ -9,6 +9,13 @@
 
 namespace servx {
 
+struct HttpCoreSrvConf: public ModuleConf {
+    int client_header_timeout;
+    int client_body_timeout;
+    int client_header_buffer_size;
+    int client_body_buffer_size;
+};
+
 class Server {
 public:
     Server();
@@ -28,7 +35,10 @@ public:
 
     Location* find_location(const std::string& uri);
 
-    ModuleConf* get_conf(int index) { return confs[index].get(); }
+    template <typename T>
+    typename T::srv_conf_t* get_conf();
+
+    HttpCoreSrvConf* get_core_conf();
 
 private:
     std::unordered_set<std::string> server_names;
@@ -39,6 +49,15 @@ private:
 
 inline bool Server::contain_server_name(const std::string& name) const {
     return server_names.find(name) != server_names.end();
+}
+
+template <typename T>
+inline typename T::srv_conf_t* Server::get_conf() {
+    return static_cast<typename T::srv_conf_t*>(confs[T::index].get());
+}
+
+inline HttpCoreSrvConf* Server::get_core_conf() {
+    return static_cast<HttpCoreSrvConf*>(confs[HTTP_CORE_MODULE].get());
 }
 
 class HttpServers: public ListeningServers {

@@ -10,6 +10,10 @@
 
 namespace servx {
 
+struct HttpCoreLocConf: public ModuleConf {
+    int client_max_body_size;
+};
+
 class Location {
 public:
     explicit Location(const std::string& s);
@@ -23,10 +27,10 @@ public:
 
     bool is_regex() const { return regex; }
 
-    ModuleConf* get_conf(int index) { return confs[index].get(); }
+    template <typename T>
+    typename T::loc_conf_t* get_conf();
 
-    uint32_t get_client_max_body_size() const { return client_max_body_size; }
-    void set_client_max_body_size(uint32_t n) { client_max_body_size = n; }
+    HttpCoreLocConf* get_core_conf();
 
     const std::string& get_root() const { return root; }
     void set_root(const std::string& s) { root = s; }
@@ -42,8 +46,16 @@ private:
     std::string root;
     std::string uri;
     std::unique_ptr<ModuleConf> confs[NULL_MODULE];
-    uint32_t client_max_body_size;
 };
+
+template <typename T>
+inline typename T::loc_conf_t* Location::get_conf() {
+    return static_cast<typename T::loc_conf_t*>(confs[T::index].get());
+}
+
+inline HttpCoreLocConf* Location::get_core_conf() {
+    return static_cast<HttpCoreLocConf*>(confs[HTTP_CORE_MODULE].get());
+}
 
 class LocationTree;
 

@@ -10,12 +10,12 @@
 namespace servx {
 
 bool EpollModule::init_conf() {
-    conf.epoll_events = 512;
+    conf->epoll_events = 512;
     return true;
 }
 
 bool EpollModule::init_process() {
-    if (conf.epoll_events <= 0) {
+    if (conf->epoll_events <= 0) {
         return false;
     }
 
@@ -24,7 +24,7 @@ bool EpollModule::init_process() {
         return false;
     }
 
-    event_list = new epoll_event[conf.epoll_events];
+    event_list = new epoll_event[conf->epoll_events];
 
     return true;
 }
@@ -155,7 +155,7 @@ bool EpollModule::del_connection(Connection* c) {
 bool EpollModule::process_events() {
     Logger::instance()->debug("epoll wait...");
 
-    int n = epoll_wait(ep, event_list, conf.epoll_events, -1);
+    int n = epoll_wait(ep, event_list, conf->epoll_events, -1);
 
     Logger::instance()->debug("epoll return, get %d", n);
 
@@ -229,10 +229,10 @@ int EpollModule::epoll_handler(command_vals_t v) {
 }
 
 int EpollModule::epoll_events_handler(command_vals_t v) {
-    conf.epoll_events = atoi(v[0].c_str());
+    conf->epoll_events = atoi(v[0].c_str());
 
-    if (conf.epoll_events <= 0) {
-        return ERROR_COMMAND;
+    if (conf->epoll_events <= 0) {
+        return SERVX_ERROR;
     }
 
     return NULL_BLOCK;

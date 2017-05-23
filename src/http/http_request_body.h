@@ -29,9 +29,6 @@ public:
     long get_content_length() const { return content_length; }
     void set_content_length(long n) { content_length = n; }
 
-    bool is_chunked() const { return chunked; }
-    void set_chunked(bool c) { chunked = c; }
-
     static void read_request_body_handler(HttpRequest* req);
     static void discard_request_body_handler(HttpRequest* req);
 
@@ -46,7 +43,6 @@ private:
     std::unique_ptr<Buffer> discard_buffer;
 
     uint32_t discarded:1;
-    uint32_t chunked:1;
 
     long content_length;
     long recv;

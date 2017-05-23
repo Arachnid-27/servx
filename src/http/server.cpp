@@ -2,17 +2,19 @@
 
 #include <algorithm>
 
+#include "http_module.h"
 #include "module_manager.h"
 #include "logger.h"
 
 namespace servx {
 
 Server::Server() {
-    auto manager = HttpModuleManager::instance();
+    auto manager = ModuleManager::instance();
     for (int i = 0; i < NULL_MODULE; ++i) {
         auto module = manager->get_module(i);
-        if (module != nullptr) {
-            confs[i] = std::unique_ptr<ModuleConf>(module->create_srv_conf());
+        if (module != nullptr && module->get_type()== HTTP_MODULE) {
+            confs[i] = std::unique_ptr<ModuleConf>(
+                static_cast<HttpModule*>(module)->create_srv_conf());
         }
     }
 }

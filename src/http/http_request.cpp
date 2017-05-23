@@ -35,19 +35,13 @@ int HttpRequest::read_request_header() {
 
     if (ev->is_ready()) {
         if (get_recv_buf()->get_remain() == 0) {
-            if (get_recv_buf()->get_size() == 8192) {
-                Logger::instance()->error("request too large");
-                finalize(HTTP_BAD_REQUEST);
-                return SERVX_ERROR;
-            }
-            get_recv_buf()->enlarge(8192);
+            // TODO: enlarge double size
+            Logger::instance()->error("request too large");
+            finalize(HTTP_BAD_REQUEST);
+            return SERVX_ERROR;
         }
 
-        int n = conn->recv_data();
-
-        Logger::instance()->debug("%d", n);
-
-        if (n == 0 || n == SERVX_ERROR) {
+        int n = conn->recv_data(); if (n == 0 || n == SERVX_ERROR) {
             if (n == 0) {
                 Logger::instance()->
                     info("client permaturely closed connection");
@@ -81,7 +75,6 @@ void HttpRequest::finalize(int rc) {
         rc = HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    conn->get_recv_buf()->reset();
 
     close(rc);
 }
@@ -103,6 +96,7 @@ void HttpRequest::close(int status) {
         conn->close();
     } else {
         Timer::instance()->add_timer(conn->get_read_event(), 120000);
+        conn->get_recv_buf()->shrink();
         conn->get_read_event()->set_ready(false);
         conn->get_read_event()->set_handler(http_wait_request_handler);
         conn->get_write_event()->set_ready(false);
@@ -133,8 +127,9 @@ void http_wait_request_handler(Event* ev) {
     }
 
     if (conn->get_recv_buf() == nullptr) {
-        // TODO: custom the size of recv buffer
-        conn->init_recv_buf(4096);
+        auto hc = conn->get_context<HttpConnection>();
+        auto srv = hc->get_servers()->get_default_server();
+        conn->init_recv_buf(srv->get_core_conf()->client_header_buffer_size);
     }
 
     Logger::instance()->debug("recv data...");
@@ -160,7 +155,6 @@ void http_wait_request_handler(Event* ev) {
     ConnectionPool::instance()->disable_reusable(conn);
 
     HttpRequest *req = new HttpRequest(conn);
-    // req->set_read_handler(http_block_reading);
 
     HttpConnection *hc = conn->get_context<HttpConnection>();
     hc->set_request(req);
@@ -224,9 +218,6 @@ void http_process_request_headers(Event* ev) {
             }
 
             auto encoding = req->get_headers("transfer-encoding");
-/*          if (encoding == "chunked") {
-                req->get_request_body()->set_chunked(true);
-            } else */
             if (!encoding.empty() && encoding != "identity") {
                 Logger::instance()->error("unknown encoding %s",
                                           encoding.c_str());
@@ -236,10 +227,6 @@ void http_process_request_headers(Event* ev) {
 
             auto connection = req->get_headers("connection");
             if (connection == "keep-alive") {
-            //    if (length.empty() && encoding != "chunked" ) {
-            //        req->finalize(HTTP_BAD_REQUEST);
-            //        return;
-            //    }
                 Logger::instance()->debug("connection keep-alive");
                 req->set_keep_alive(true);
                 req->get_response()->set_keep_alive(true);
@@ -348,38 +335,39 @@ void http_process_request_line(Event* ev) {
 
 void http_init_connection(Connection* conn) {
     if (!add_event(conn->get_read_event(), 0)) {
-        Logger::instance()->error("can not add event");
+        Logger::instance()->error("add event failed");
         conn->close();
         return;
     }
 
-    Logger::instance()->debug("find listening...");
-
     auto lst = Listener::instance()
         ->find_listening(conn->get_local_sockaddr());
     auto rev = conn->get_read_event();
+    auto wev = conn->get_write_event();
 
     Logger::instance()->debug("find listening success, is_wildcard = %d",
                                lst->get_socket()->is_wildcard());
 
     rev->set_handler(http_wait_request_handler);
+    wev->set_handler(http_empty_write_handler);
 
-    HttpConnection *hc = new HttpConnection;
-    hc->set_servers(lst->get_servers<HttpServers>());
-    conn->set_context(hc);
+    HttpServers *srvs = lst->get_servers<HttpServers>();
+    conn->set_context(new HttpConnection(srvs));
 
     if (rev->is_ready()) { // deferred_accept
         rev->handle();
         return;
     }
 
-    // TODO: custom timeout
-    Timer::instance()->add_timer(conn->get_read_event(), 60000);
+    auto conf = srvs->get_default_server()->get_core_conf();
+    Timer::instance()->add_timer(conn->get_read_event(), conf->client_header_timeout);
     ConnectionPool::instance()->enable_reusable(conn);
 
     Logger::instance()->debug("init connection success");
 }
 
 void http_block_reading(HttpRequest* req) {}
+
+void http_block_writing(HttpRequest* req) {}
 
 }

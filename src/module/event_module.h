@@ -25,7 +25,7 @@ protected:
         : Module(EVENT_MODULE, v) {}
 };
 
-struct MainEventConf {
+struct MainEventConf: public ModuleConf {
     int time_resolution;
     int connections;
     bool multi_accept;
@@ -60,9 +60,15 @@ public:
 
     int event_handler(command_vals_t v);
 
-    int timer_resolution_handler(command_vals_t v);
+    int timer_resolution_handler(command_vals_t v) {
+        return set_conf_int<MainEventConf,
+            &MainEventConf::time_resolution>(conf, v[0]);
+    }
 
-    int connections_handler(command_vals_t v);
+    int connections_handler(command_vals_t v) {
+        return set_conf_int<MainEventConf,
+            &MainEventConf::connections>(conf, v[0]);
+    }
 
     int multi_accept_handler(command_vals_t v);
 

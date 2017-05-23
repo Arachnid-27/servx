@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
-#define ERROR_COMMAND -1
+#include "core.h"
 
 #define lambda_handler(handler)                                 \
         [this](command_vals_t v) { return this->handler(v); }
@@ -36,8 +36,8 @@ enum CommandBlock {
 };
 
 using command_vals_t = const std::vector<std::string>&;
-using command_handler_t = std::function<int (command_vals_t)>;
-using command_post_handler_t = std::function<bool ()>;
+using command_handler_t = std::function<int(command_vals_t)>;
+using command_post_handler_t = std::function<bool()>;
 
 class Command {
 public:
@@ -108,6 +108,16 @@ inline std::vector<Command*> Module::get_commands() const {
 
 class ModuleConf {};
 
+template <typename T, typename U>
+struct __conf_creator {
+    U* create() { return new T(); }
+};
+
+template <typename U>
+struct __conf_creator<void, U> {
+    U* create() { return nullptr; }
+};
+
 template <typename ModuleType, typename Conf, int Index>
 class ModuleWithConf: public ModuleType {
 public:
@@ -116,14 +126,35 @@ public:
     enum { index = Index };
 
 public:
-    Conf* get_conf() { return &conf; }
+    Conf* get_conf() { return conf; }
 
 protected:
-    ModuleWithConf(const std::initializer_list<Command*>& v): ModuleType(v) {}
+    ModuleWithConf(const std::initializer_list<Command*>& v)
+        : ModuleType(v), conf(__conf_creator<Conf, Conf>().create()) {}
 
 protected:
-    Conf conf;
+    Conf *conf;
 };
+
+template <typename T, int T::* M, int R = NULL_BLOCK>
+int set_conf_int(T* conf, const std::string& str) {
+    int val = atoi(str.c_str());
+    if (val <= 0) {
+        return SERVX_ERROR;
+    }
+    conf->*M = val;
+    return R;
+}
+
+template <typename T, void (T::* M)(int), int R = NULL_BLOCK>
+int set_conf_int(T* conf, const std::string& str) {
+    int val = atoi(str.c_str());
+    if (val <= 0) {
+        return SERVX_ERROR;
+    }
+    (conf->*M)(val);
+    return R;
+}
 
 }
 

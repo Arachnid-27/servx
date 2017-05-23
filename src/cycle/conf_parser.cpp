@@ -53,7 +53,7 @@ bool ConfParser::process(const ConfItem& item, int block) {
 
     int rc = cmd->execute(v);
 
-    if (rc == ERROR_COMMAND) {
+    if (rc == STATE_ERROR) {
         return false;
     }
 
