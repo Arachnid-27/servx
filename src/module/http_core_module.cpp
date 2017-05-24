@@ -1,5 +1,6 @@
 #include "http_core_module.h"
 
+#include "http_listening.h"
 #include "http_phase.h"
 #include "module_manager.h"
 #include "listener.h"
@@ -119,14 +120,14 @@ bool HttpCoreModule::address_post_handler() {
         return false;
     }
 
-    HttpServers *hs = lst->get_servers<HttpServers>();
-    if (hs == nullptr) {
-        hs = new HttpServers;
-        lst->set_servers(hs);
-        lst->set_handler(http_init_connection);
+    HttpListening *hl = lst->get_context<HttpListening>();
+    if (hl == nullptr) {
+        hl = new HttpListening;
+        lst->set_context(hl);
+        lst->set_handler(HttpListening::init_connection);
     }
 
-    return hs->push_server(srv.get(), default_server);
+    return hl->push_server(srv.get(), default_server);
 }
 
 bool HttpCoreModule::location_post_handler() {

@@ -29,8 +29,6 @@ void worker_process_cycle() {
     while (true) {
         process_event();
 
-        Logger::instance()->debug("call expire_timer()");
-
         Timer::instance()->expire_timer();
     }
 }

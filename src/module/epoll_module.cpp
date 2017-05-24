@@ -60,9 +60,6 @@ bool EpollModule::add_event(Event* ev, int flags) {
 
     ee.data.ptr = c;
 
-    Logger::instance()->debug("call epoll_ctl op = %d, fd = %d flags = %d",
-        op, c->get_fd(), ee.events);
-
     if (epoll_ctl(ep, op, c->get_fd(), &ee) == -1) {
         return false;
     }
@@ -153,8 +150,6 @@ bool EpollModule::del_connection(Connection* c) {
 }
 
 bool EpollModule::process_events() {
-    Logger::instance()->debug("epoll wait...");
-
     int n = epoll_wait(ep, event_list, conf->epoll_events, -1);
 
     Logger::instance()->debug("epoll return, get %d", n);

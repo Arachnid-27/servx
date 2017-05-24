@@ -39,17 +39,11 @@ public:
     void set_version(std::string&& s) { version = std::move(s); }
 
     const std::string& get_method() const { return method; }
-    const std::string& get_schema() const { return schema; }
-    const std::string& get_host() const { return host; }
-    const std::string& get_port() const { return port; }
     const std::string& get_uri() const { return uri; }
-    const std::string& get_args() const { return args; }
-    const std::string& get_version() const { return version; }
 
-    void handle_read() { read_handler(this); }
+    void handle(Event* ev);
+
     void set_read_handler(const http_req_handler_t& h) { read_handler = h; }
-
-    void handle_write() { write_handler(this); }
     void set_write_handler(const http_req_handler_t& h) { write_handler = h; }
 
     int get_parse_state() const { return parse_state; }
@@ -59,16 +53,12 @@ public:
 
     Buffer* get_recv_buf() const { return conn->get_recv_buf(); }
 
-    int get_buf_offset() const { return buf_offset; }
-    void set_buf_offset(int n) { buf_offset = n; }
-
     Server* get_server() const { return server; }
     void set_server(Server* srv) { server = srv; }
 
     Location* get_location() const { return location; }
     void set_location(Location* loc) { location = loc; }
 
-    bool is_quoted() const { return quoted; }
     void set_quoted(bool q) { quoted = q; }
 
     bool is_keep_alive() const { return keep_alive; }
@@ -91,7 +81,9 @@ public:
     HttpResponse* get_response() { return response.get(); }
     HttpRequestBody* get_request_body() { return body.get(); }
 
-    int read_request_header();
+    int read_headers();
+    void process_line(Event* ev);
+    void process_headers(Event* ev);
 
     void finalize(int rc);
     void close(int status);
@@ -100,7 +92,6 @@ private:
     Connection *conn;
     HttpMethod http_method;
     int parse_state;
-    int buf_offset;
     // void** ctx;
     http_req_handler_t read_handler;
     http_req_handler_t write_handler;
@@ -138,36 +129,8 @@ inline void HttpRequest::set_headers_value(std::string&& s) {
     headers.emplace(std::move(name), std::move(s));
 }
 
-class HttpConnection: public ConnectionContext {
-public:
-    HttpConnection(HttpServers* srvs): servers(srvs) {}
-
-    HttpConnection(const HttpConnection&);
-    HttpConnection(HttpConnection&&);
-    HttpConnection& operator=(const HttpConnection&);
-    HttpConnection& operator=(HttpConnection&&);
-
-    HttpServers* get_servers() const { return servers; }
-
-    HttpRequest* get_request() const { return request.get(); }
-    void set_request(HttpRequest* req);
-
-private:
-    HttpServers *servers;
-    std::unique_ptr<HttpRequest> request;
-};
-
-inline void HttpConnection::set_request(HttpRequest* req) {
-    request = std::unique_ptr<HttpRequest>(req);
-}
-
-void http_wait_request_handler(Event* ev);
-void http_process_request_line(Event* ev);
-
 void http_block_reading(HttpRequest* req);
 void http_block_writing(HttpRequest* req);
-
-void http_init_connection(Connection* conn);
 
 }
 

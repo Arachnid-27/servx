@@ -33,7 +33,12 @@ public:
 
     ~Logger() = default;
 
-    void debug(const char* fmt, ...) { log_with_level("debug"); }
+    void debug(const char* fmt, ...) {
+#ifdef SERVX_DEBUG
+        log_with_level("debug");
+#endif
+    }
+
     void info(const char* fmt, ...) { log_with_level("info"); }
     void warn(const char* fmt, ...) { log_with_level("warn"); }
     void error(const char* fmt, ...) { log_with_level("error"); }

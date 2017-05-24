@@ -60,28 +60,6 @@ inline HttpCoreSrvConf* Server::get_core_conf() {
     return static_cast<HttpCoreSrvConf*>(confs[HTTP_CORE_MODULE].get());
 }
 
-class HttpServers: public ListeningServers {
-public:
-    HttpServers(): default_server(nullptr) {}
-
-    HttpServers(const Server&) = delete;
-    HttpServers(Server&&) = delete;
-    HttpServers& operator=(const Server&) = delete;
-    HttpServers& operator=(Server&&) = delete;
-
-    ~HttpServers() = default;
-
-    bool push_server(Server* srv, bool def);
-
-    Server* search_server(const std::string& name);
-
-    Server* get_default_server() { return default_server; }
-
-private:
-    Server* default_server;
-    std::vector<Server*> servers;
-};
-
 }
 
 #endif

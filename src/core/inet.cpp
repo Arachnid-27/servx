@@ -4,6 +4,7 @@
 #include <netdb.h>
 #include <netinet/tcp.h>
 #include <unistd.h>
+#include "logger.h"
 
 namespace servx {
 
@@ -61,8 +62,7 @@ bool TcpSocket::init_addr(const std::string& s, const std::string& port) {
 
     // Todo * return ipv6
 
-    if (getaddrinfo(s.c_str(), port.c_str(), &hint, &res) == -1) {
-        // err_log
+    if (getaddrinfo(s.c_str(), port.c_str(), &hint, &res) != 0) {
         return false;
     }
 

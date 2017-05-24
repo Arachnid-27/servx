@@ -5,9 +5,9 @@
 #include "connection_pool.h"
 #include "core.h"
 #include "event_module.h"
-#include "http_phase.h"
+#include "http_connection.h"
 #include "http_parse.h"
-#include "io.h"
+#include "http_phase.h"
 #include "logger.h"
 #include "timer.h"
 
@@ -15,7 +15,7 @@ namespace servx {
 
 HttpRequest::HttpRequest(Connection* c)
     : conn(c), http_method(HTTP_METHOD_UNKONWN), parse_state(0),
-      buf_offset(0), body(new HttpRequestBody(this)),
+      body(new HttpRequestBody(this)),
       response(new HttpResponse(c)),
       phase(HTTP_POST_READ_PHASE), phase_index(0),
       content_handler(nullptr), server(nullptr),
@@ -30,38 +30,203 @@ std::string HttpRequest::get_headers(const char* s) const {
     return iter->second;
 }
 
-int HttpRequest::read_request_header() {
-    Event *ev = conn->get_read_event();
+void HttpRequest::handle(Event* ev) {
+    // TODO: cancel dalay
 
-    if (ev->is_ready()) {
-        if (get_recv_buf()->get_remain() == 0) {
-            // TODO: enlarge double size
-            Logger::instance()->error("request too large");
-            finalize(HTTP_BAD_REQUEST);
-            return SERVX_ERROR;
-        }
-
-        int n = conn->recv_data(); if (n == 0 || n == SERVX_ERROR) {
-            if (n == 0) {
-                Logger::instance()->
-                    info("client permaturely closed connection");
-            }
-            finalize(HTTP_BAD_REQUEST);
-            return SERVX_ERROR;
-        }
-
-        if (n == SERVX_AGAIN) {
-            if (!ev->is_timer()) {
-                Timer::instance()->add_timer(ev, 60000);
-            }
-            ConnectionPool::instance()->enable_reusable(conn);
-            return SERVX_AGAIN;
-        }
-
-        return SERVX_OK;
+    if (ev->is_write_event()) {
+        write_handler(this);
+    } else {
+        read_handler(this);
     }
 
-    return SERVX_AGAIN;
+    // TODO: process subrequest
+}
+
+int HttpRequest::read_headers() {
+    Event *ev = conn->get_read_event();
+
+    if (get_recv_buf()->get_remain() == 0) {
+        // TODO: enlarge double size
+        Logger::instance()->error("request too large");
+        finalize(HTTP_BAD_REQUEST);
+        return SERVX_ERROR;
+    }
+
+    int n = conn->recv_data();
+
+    if (n == 0 || n == SERVX_ERROR) {
+        if (n == 0) {
+            Logger::instance()->
+                info("client permaturely closed connection");
+        }
+        finalize(HTTP_BAD_REQUEST);
+        return SERVX_ERROR;
+    }
+
+    if (n == SERVX_AGAIN) {
+        if (!ev->is_timer()) {
+            Timer::instance()->add_timer(ev,
+                server->get_core_conf()->client_header_timeout);
+        }
+        ConnectionPool::instance()->enable_reusable(conn);
+        return SERVX_AGAIN;
+    }
+
+    return SERVX_OK;
+}
+
+void HttpRequest::process_headers(Event* ev) {
+    if (ev->is_timeout()) {
+        Logger::instance()->info("%d client time out", HTTP_REQUEST_TIME_OUT);
+        conn->set_timeout(true);
+        close(HTTP_REQUEST_TIME_OUT);
+        return;
+    }
+
+    int rc;
+
+    if (ev->is_ready()) {
+        rc = read_headers();
+        if (rc != SERVX_OK) {
+            return;
+        }
+    }
+
+    rc = http_parse_request_headers(this);
+
+    if (rc == SERVX_OK) {
+        Logger::instance()->debug("parse request headers success!");
+
+        auto host = get_headers("host");
+        if (host.empty()) {
+            Logger::instance()->error("can not find host");
+            finalize(HTTP_BAD_REQUEST);
+            return;
+        } else {
+            HttpConnection *hc = conn->get_context<HttpConnection>();
+            server = hc->get_listening()->search_server(host);
+            if (server == hc->get_listening()->get_default_server()) {
+                Logger::instance()->debug("use default server");
+            }
+        }
+
+        auto length = get_headers("content-length");
+        if (!length.empty()) {
+            long n = atol(length.c_str());
+            if (n == 0 && length != "0") {
+                finalize(HTTP_BAD_REQUEST);
+                return;
+            }
+            body->set_content_length(n);
+        }
+
+        auto encoding = get_headers("transfer-encoding");
+        if (!encoding.empty() && encoding != "identity") {
+            Logger::instance()->error("unknown encoding %s",
+                                      encoding.c_str());
+            finalize(HTTP_NOT_IMPLEMENTED);
+            return;
+        }
+
+        auto connection = get_headers("connection");
+        if (connection == "keep-alive") {
+            Logger::instance()->debug("connection keep-alive");
+            set_keep_alive(true);
+            get_response()->set_keep_alive(true);
+        }
+
+        if (conn->get_read_event()->is_timer()) {
+            Timer::instance()->del_timer(conn->get_read_event());
+        }
+
+        conn->get_read_event()->set_handler(
+            [this](Event* ev) { this->handle(ev); });
+        conn->get_write_event()->set_handler(
+            [this](Event* ev) { this->handle(ev); });
+        set_read_handler(http_block_reading);
+        set_write_handler([](HttpRequest* req)
+            { HttpPhaseRunner::instance()->run(req); });
+
+        Logger::instance()->debug("prepare to run phase...");
+
+        write_handler(this);
+        return;
+    }
+
+    if (rc != SERVX_AGAIN) {
+        finalize(HTTP_BAD_REQUEST);
+    }
+}
+
+void HttpRequest::process_line(Event* ev) {
+    Connection *conn = ev->get_connection();
+
+    if (ev->is_timeout()) {
+        Logger::instance()->info("%d client time out", HTTP_REQUEST_TIME_OUT);
+        conn->set_timeout(true);
+        close(HTTP_REQUEST_TIME_OUT);
+        return;
+    }
+
+    int rc;
+
+    if (ev->is_ready()) {
+        rc = read_headers();
+        if (rc != SERVX_OK) {
+            return;
+        }
+    }
+
+    rc = http_parse_request_line(this);
+
+    if (rc == SERVX_OK) {
+        Logger::instance()->debug("parsing request success!\n"   \
+                                  "method: %s\n"                 \
+                                  "schema: %s\n"                 \
+                                  "host: %s\n"                   \
+                                  "uri: %s\n"                    \
+                                  "args: %s\n"                   \
+                                  "version: %s\n",
+                                  method.c_str(),
+                                  schema.c_str(),
+                                  host.c_str(),
+                                  uri.c_str(),
+                                  args.c_str(),
+                                  version.c_str());
+
+        if (version != "1.1") {
+            finalize(HTTP_BAD_REQUEST);
+            return;
+        }
+
+        if (quoted) {
+            if (http_parse_quoted(this) == SERVX_ERROR) {
+                finalize(HTTP_BAD_REQUEST);
+                return;
+            }
+        }
+
+        if (!args.empty()) {
+            if (http_parse_args(this) == SERVX_ERROR) {
+                finalize(HTTP_BAD_REQUEST);
+                return;
+            }
+        }
+
+        if (!host.empty()) {
+            // TODO: check host format
+        }
+
+        Logger::instance()->debug("prepare to process request headers...");
+
+        ev->set_handler([this](Event* ev) { this->process_headers(ev); });
+        process_headers(ev);
+        return;
+    }
+
+    if (rc != SERVX_AGAIN) {
+        finalize(HTTP_BAD_REQUEST);
+    }
 }
 
 void HttpRequest::finalize(int rc) {
@@ -75,7 +240,6 @@ void HttpRequest::finalize(int rc) {
         rc = HTTP_INTERNAL_SERVER_ERROR;
     }
 
-
     close(rc);
 }
 
@@ -87,7 +251,10 @@ void HttpRequest::close(int status) {
     }
 
     if (status == HTTP_REQUEST_TIME_OUT ||
-        conn->get_read_event()->is_eof()) {
+        conn->get_read_event()->is_eof() ||
+        conn->is_error() ||
+        conn->is_timeout()) {
+        conn->close();
         return;
     }
 
@@ -96,274 +263,15 @@ void HttpRequest::close(int status) {
         conn->close();
     } else {
         Timer::instance()->add_timer(conn->get_read_event(), 120000);
+        HttpConnection *hc = conn->get_context<HttpConnection>();
         conn->get_recv_buf()->shrink();
         conn->get_read_event()->set_ready(false);
-        conn->get_read_event()->set_handler(http_wait_request_handler);
+        conn->get_read_event()->set_handler([hc](Event* ev)
+            { hc->wait_request(ev); });
         conn->get_write_event()->set_ready(false);
         conn->get_write_event()->set_handler(http_empty_write_handler);
+        hc->close_request();
     }
-}
-
-void http_request_handler(Event* ev) {
-    HttpRequest *req = ev->get_connection()->
-        get_context<HttpConnection>()->get_request();
-
-    // TODO: cancel dalay
-
-    if (ev->is_write_event()) {
-        req->handle_write();
-    } else {
-        req->handle_read();
-    }
-
-    // TODO: process subrequest
-}
-
-void http_wait_request_handler(Event* ev) {
-    Connection *conn = ev->get_connection();
-    if (ev->is_timeout()) {
-        conn->close();
-        return;
-    }
-
-    if (conn->get_recv_buf() == nullptr) {
-        auto hc = conn->get_context<HttpConnection>();
-        auto srv = hc->get_servers()->get_default_server();
-        conn->init_recv_buf(srv->get_core_conf()->client_header_buffer_size);
-    }
-
-    Logger::instance()->debug("recv data...");
-
-    int n = conn->recv_data();
-
-    if (n == 0 || n == SERVX_ERROR) {
-        if (n == 0) {
-            Logger::instance()->info("client closed connection");
-        }
-        conn->close();
-        return;
-    }
-
-    if (n == SERVX_AGAIN) {
-        if (!ev->is_timer()) {
-            Timer::instance()->add_timer(ev, 60000);
-        }
-        ConnectionPool::instance()->enable_reusable(conn);
-        return;
-    }
-
-    ConnectionPool::instance()->disable_reusable(conn);
-
-    HttpRequest *req = new HttpRequest(conn);
-
-    HttpConnection *hc = conn->get_context<HttpConnection>();
-    hc->set_request(req);
-
-    Logger::instance()->debug("prepare to process request line");
-
-    ev->set_handler(http_process_request_line);
-    ev->handle();
-}
-
-void http_process_request_headers(Event* ev) {
-    Connection *conn = ev->get_connection();
-    HttpRequest *req = conn->get_context<HttpConnection>()->get_request();
-    Buffer *buf = req->get_recv_buf();
-
-    if (ev->is_timeout()) {
-        Logger::instance()->info("%d client time out", HTTP_REQUEST_TIME_OUT);
-        conn->set_timeout(true);
-        req->close(HTTP_REQUEST_TIME_OUT);
-        return;
-    }
-
-    int rc;
-
-    while (true) {
-        if (buf->get_pos() + req->get_buf_offset() == buf->get_last()) {
-            rc = req->read_request_header();
-            if (rc != SERVX_OK) {
-                return;
-            }
-        }
-
-        rc = http_parse_request_headers(req);
-
-        if (rc == SERVX_OK) {
-            Logger::instance()->debug("parsing header success");
-
-            auto host = req->get_headers("host");
-            if (host.empty()) {
-                Logger::instance()->error("can not find host");
-                req->finalize(HTTP_BAD_REQUEST);
-                return;
-            } else {
-                auto ctx = conn->get_context<HttpConnection>();
-                Server *srv = ctx->get_servers()->search_server(host);
-                req->set_server(srv);
-
-                if (srv == ctx->get_servers()->get_default_server()) {
-                    Logger::instance()->debug("use default server");
-                }
-            }
-
-            auto length = req->get_headers("content-length");
-            if (!length.empty()) {
-                long n = atol(length.c_str());
-                if (n == 0 && length != "0") {
-                    req->finalize(HTTP_BAD_REQUEST);
-                    return;
-                }
-                req->get_request_body()->set_content_length(n);
-            }
-
-            auto encoding = req->get_headers("transfer-encoding");
-            if (!encoding.empty() && encoding != "identity") {
-                Logger::instance()->error("unknown encoding %s",
-                                          encoding.c_str());
-                req->finalize(HTTP_NOT_IMPLEMENTED);
-                return;
-            }
-
-            auto connection = req->get_headers("connection");
-            if (connection == "keep-alive") {
-                Logger::instance()->debug("connection keep-alive");
-                req->set_keep_alive(true);
-                req->get_response()->set_keep_alive(true);
-            }
-
-            if (conn->get_read_event()->is_timer()) {
-                Timer::instance()->del_timer(conn->get_read_event());
-            }
-
-            Logger::instance()->debug("prepare to run phases");
-
-            conn->get_read_event()->set_handler(http_request_handler);
-            conn->get_write_event()->set_handler(http_request_handler);
-            req->set_read_handler(http_block_reading);
-            req->set_write_handler([](HttpRequest* req)
-                { HttpPhaseRunner::instance()->run(req); });
-
-            req->handle_write();
-
-            return;
-        }
-
-        if (rc != SERVX_AGAIN) {
-            req->finalize(HTTP_BAD_REQUEST);
-            return;
-        }
-    }
-}
-
-void http_process_request_line(Event* ev) {
-    Connection *conn = ev->get_connection();
-    HttpRequest *req = conn->get_context<HttpConnection>()->get_request();
-    Buffer *buf = req->get_recv_buf();
-
-    if (ev->is_timeout()) {
-        Logger::instance()->info("%d client time out", HTTP_REQUEST_TIME_OUT);
-        conn->set_timeout(true);
-        req->close(HTTP_REQUEST_TIME_OUT);
-        return;
-    }
-
-    int rc;
-
-    while (true) {
-        if (buf->get_pos() + req->get_buf_offset() == buf->get_last()) {
-            rc = req->read_request_header();
-            if (rc != SERVX_OK) {
-                return;
-            }
-        }
-
-        Logger::instance()->debug("parsing request line...");
-
-        rc = http_parse_request_line(req);
-
-        if (rc == SERVX_OK) {
-            Logger::instance()->debug("parsing request success!\n"   \
-                                      "method: %s\n"                 \
-                                      "schema: %s\n"                 \
-                                      "host: %s\n"                   \
-                                      "uri: %s\n"                    \
-                                      "args: %s\n"                   \
-                                      "version: %s\n",
-                                      req->get_method().c_str(),
-                                      req->get_schema().c_str(),
-                                      req->get_host().c_str(),
-                                      req->get_uri().c_str(),
-                                      req->get_args().c_str(),
-                                      req->get_version().c_str());
-
-            if (req->get_version() != "1.1") {
-                req->finalize(HTTP_BAD_REQUEST);
-                return;
-            }
-
-            if (req->is_quoted()) {
-                if (http_parse_quoted(req) == SERVX_ERROR) {
-                    req->finalize(HTTP_BAD_REQUEST);
-                    return;
-                }
-            }
-
-            if (!req->get_args().empty()) {
-                if (http_parse_args(req) == SERVX_ERROR) {
-                    req->finalize(HTTP_BAD_REQUEST);
-                    return;
-                }
-            }
-
-            if (!req->get_host().empty()) {
-                // TODO: check host format
-            }
-
-            ev->set_handler(http_process_request_headers);
-            ev->handle();
-
-            return;
-        }
-
-        if (rc != SERVX_AGAIN) {
-            req->finalize(HTTP_BAD_REQUEST);
-            return;
-        }
-    }
-}
-
-void http_init_connection(Connection* conn) {
-    if (!add_event(conn->get_read_event(), 0)) {
-        Logger::instance()->error("add event failed");
-        conn->close();
-        return;
-    }
-
-    auto lst = Listener::instance()
-        ->find_listening(conn->get_local_sockaddr());
-    auto rev = conn->get_read_event();
-    auto wev = conn->get_write_event();
-
-    Logger::instance()->debug("find listening success, is_wildcard = %d",
-                               lst->get_socket()->is_wildcard());
-
-    rev->set_handler(http_wait_request_handler);
-    wev->set_handler(http_empty_write_handler);
-
-    HttpServers *srvs = lst->get_servers<HttpServers>();
-    conn->set_context(new HttpConnection(srvs));
-
-    if (rev->is_ready()) { // deferred_accept
-        rev->handle();
-        return;
-    }
-
-    auto conf = srvs->get_default_server()->get_core_conf();
-    Timer::instance()->add_timer(conn->get_read_event(), conf->client_header_timeout);
-    ConnectionPool::instance()->enable_reusable(conn);
-
-    Logger::instance()->debug("init connection success");
 }
 
 void http_block_reading(HttpRequest* req) {}

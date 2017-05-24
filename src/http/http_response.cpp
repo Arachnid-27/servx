@@ -63,7 +63,7 @@ int HttpResponse::send_header() {
     out.emplace_back();
 
     std::list<Buffer> &chain = out.back().chain;
-    chain.emplace_back(2048);
+    chain.emplace_back(4096);
 
     int n;
     Buffer *buf = &chain.back();
@@ -129,7 +129,7 @@ int HttpResponse::send_header() {
         // but we should discard the last result (don't invoke set_last)
         // becase we don't know if it is truncated
         if (pos + n == buf->get_end()) {
-            chain.emplace_back(2048);
+            chain.emplace_back(4096);
             buf = &chain.back();
             pos = buf->get_pos();
             n = snprintf(pos, buf->get_remain(), "%s:%s\r\n",
@@ -207,9 +207,10 @@ int HttpResponse::send() {
                     iter = files.erase(iter);
                 }
             } else {
-                chain.emplace_back(1024);
+                chain.emplace_back(4096);
                 auto iter = files.begin();
                 while (!files.empty()) {
+                    // TODO: read partical && write
                     if (!(*iter)->file_status()) {
                         return SERVX_ERROR;
                     }
@@ -221,15 +222,19 @@ int HttpResponse::send() {
                         return rc;
                     }
 
+                    if (rc == 0) {
+                        return SERVX_ERROR;
+                    }
+
                     int bytes = (*iter)->get_offset() + rc;
                     (*iter)->set_offset(bytes);
-                    chain.back().set_last(chain.back().get_pos() + rc);
+                    chain.back().move_last(rc);
 
                     if (bytes == (*iter)->get_file_size()) {
                         iter = files.erase(iter);
                         continue;
                     } else if (chain.back().get_remain() == 0) {
-                        chain.emplace_back(1024);
+                        chain.emplace_back(4096);
                         continue;
                     } else {
                         break;

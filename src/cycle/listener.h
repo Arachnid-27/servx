@@ -10,7 +10,7 @@
 
 namespace servx {
 
-struct ListeningServers {};
+struct ListeningContext {};
 
 class Listening {
 public:
@@ -27,9 +27,9 @@ public:
     int open_socket() { return socket->open_socket(); }
 
     template <class T>
-    T* get_servers() { return static_cast<T*>(servers.get()); }
+    T* get_context() { return static_cast<T*>(context.get()); }
     template <class T>
-    void set_servers(T* p) { servers = std::unique_ptr<T>(p); }
+    void set_context(T* p) { context = std::unique_ptr<T>(p); }
 
     const std::shared_ptr<TcpSocket>& get_socket() const { return socket; }
 
@@ -47,7 +47,7 @@ private:
     // this is listen connection, not connect connection
     Connection *conn;
     std::function<void(Connection*)> handler;
-    std::unique_ptr<ListeningServers> servers;
+    std::unique_ptr<ListeningContext> context;
     std::shared_ptr<TcpSocket> socket;
 };
 
@@ -63,11 +63,9 @@ public:
     Listening* push_address(const std::shared_ptr<TcpSocket>& addr);
 
     bool init_listenings();
-
     bool open_listenings();
 
     bool enable_all();
-
     bool disable_all();
 
     Listening* find_listening(sockaddr* addr);
@@ -77,7 +75,6 @@ public:
 private:
     Listener() = default;
 
-private:
     std::vector<Listening*> listenings;
     std::unordered_map<int,
         std::vector<std::unique_ptr<Listening>>> ports;

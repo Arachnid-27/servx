@@ -1,10 +1,8 @@
 #include "server.h"
 
-#include <algorithm>
-
-#include "http_module.h"
 #include "module_manager.h"
 #include "logger.h"
+#include "http_module.h"
 
 namespace servx {
 
@@ -32,29 +30,6 @@ Location* Server::find_location(const std::string& uri) {
     // TODO: regex_locations
 
     return prefix_locations.find(uri);
-}
-
-bool HttpServers::push_server(Server* srv, bool def) {
-    if (def) {
-        if (default_server != nullptr) {
-            Logger::instance()->error("default server exists!");
-            return false;
-        }
-        default_server = srv;
-    }
-    servers.push_back(srv);
-
-    return true;
-}
-
-Server* HttpServers::search_server(const std::string& name) {
-    auto iter = std::find_if(servers.begin(), servers.end(),
-        [&](const Server* srv) { return srv->contain_server_name(name); });
-
-    if (iter != servers.end()) {
-        return *iter;
-    }
-    return default_server;
 }
 
 }

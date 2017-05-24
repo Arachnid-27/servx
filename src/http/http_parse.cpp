@@ -110,7 +110,7 @@ int http_parse_request_line(HttpRequest* req) {
     char *last = buf->get_last();
     char c, ch;
 
-    for (char *p = start + req->get_buf_offset(); p < last; ++p) {
+    for (char *p = start; p < last; ++p) {
         ch = *p;
 
         switch (state) {
@@ -419,7 +419,6 @@ int http_parse_request_line(HttpRequest* req) {
                 req->set_version(std::string(start, p));
                 buf->set_pos(p + 1);
                 req->set_parse_state(PARSE_START);
-                req->set_buf_offset(0);
                 return SERVX_OK;
             default:
                 return SERVX_ERROR;
@@ -438,7 +437,6 @@ int http_parse_request_line(HttpRequest* req) {
                 break;
             case LF:
                 buf->set_pos(p + 1);
-                req->set_buf_offset(0);
                 req->set_parse_state(PARSE_START);
                 return SERVX_OK;
             default:
@@ -450,7 +448,6 @@ int http_parse_request_line(HttpRequest* req) {
         case PARSE_LAST_CR_LF:
             if (ch == LF) {
                 buf->set_pos(p + 1);
-                req->set_buf_offset(0);
                 req->set_parse_state(PARSE_START);
                 return SERVX_OK;
             }
@@ -461,7 +458,6 @@ int http_parse_request_line(HttpRequest* req) {
 
     buf->set_pos(start);
     req->set_parse_state(state);
-    req->set_buf_offset(last - start);
     return SERVX_AGAIN;
 }
 
@@ -508,7 +504,7 @@ int http_parse_request_headers(HttpRequest* req) {
     char *last = buf->get_last();
     char ch;
 
-    for (char *p = start + req->get_buf_offset(); p < last; ++p) {
+    for (char *p = start; p < last; ++p) {
         ch = *p;
 
         switch (state) {
@@ -519,7 +515,6 @@ int http_parse_request_headers(HttpRequest* req) {
                 break;
             case LF:
                 req->set_parse_state(PARSE_DONE);
-                req->set_buf_offset(0);
                 buf->set_pos(p + 1);
                 return SERVX_OK;
             default:
@@ -624,7 +619,6 @@ int http_parse_request_headers(HttpRequest* req) {
         case PARSE_LAST_CR_LF_CR_LF:
             if (ch == LF) {
                 req->set_parse_state(PARSE_DONE);
-                req->set_buf_offset(0);
                 buf->set_pos(p + 1);
                 return SERVX_OK;
             }
@@ -635,7 +629,6 @@ int http_parse_request_headers(HttpRequest* req) {
 
     buf->set_pos(start);
     req->set_parse_state(state);
-    req->set_buf_offset(last - start);
     return SERVX_AGAIN;
 }
 

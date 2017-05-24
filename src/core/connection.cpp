@@ -75,6 +75,12 @@ void Connection::close() {
 
     ctx = nullptr;
     recv_buf = nullptr;
+    listen = 0;
+    timeout = 0;
+    error = 0;
+
+    read_event.reset();
+    write_event.reset();
 
     ConnectionPool::instance()->ret_connection(this);
 
@@ -93,7 +99,7 @@ int Connection::recv_data(Buffer* buf, uint32_t count) {
     int n = io_read(socket_fd, buf->get_last(), count);
 
     if (n > 0) {
-        buf->set_last(buf->get_pos() + n);
+        buf->move_last(n);
         if (static_cast<uint32_t>(n) < count) {
             read_event.set_ready(false);
         }
@@ -112,10 +118,11 @@ int Connection::recv_data(Buffer* buf, uint32_t count) {
 
 int Connection::send_chain(std::list<Buffer>& chain) {
     struct iovec iovs[64];
-    int total = 0;
-    int cnt = 0;
+    int total, cnt;
 
     while (!chain.empty()) {
+        total = cnt = 0;
+
         for (auto &buf : chain) {
             iovs[cnt].iov_base = static_cast<void*>(buf.get_pos());
             iovs[cnt].iov_len = buf.get_size();
@@ -133,7 +140,7 @@ int Connection::send_chain(std::list<Buffer>& chain) {
                 uint32_t num = n;
                 while (iter != chain.end()) {
                     if (num < iter->get_size()) {
-                        iter->set_pos(iter->get_pos() + num);
+                        iter->move_pos(num);
                         break;
                     }
                     num -= iter->get_size();

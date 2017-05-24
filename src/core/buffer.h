@@ -25,6 +25,9 @@ public:
 
     char *get_end() const { return end; }
 
+    void move_pos(int n) { pos += n; }
+    void move_last(int n) { last += n; }
+
     uint32_t get_size() const { return last - pos; }
     uint32_t get_capacity() const { return end - start; }
     uint32_t get_remain() const { return end - last; }
