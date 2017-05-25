@@ -10,6 +10,9 @@ namespace servx {
 class TimerCompare {
 public:
     bool operator()(Event* lhs, Event* rhs) const {
+        if (lhs->get_timer() == rhs->get_timer()) {
+            return lhs < rhs;
+        }
         return lhs->get_timer() < rhs->get_timer();
     }
 };

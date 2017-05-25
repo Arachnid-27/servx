@@ -8,7 +8,8 @@
 #include "logger.h"
 #include "master.h"
 #include "module_manager.h"
-#include "process.h"
+#include "process_manager.h"
+#include "signals.h"
 #include "worker.h"
 
 using namespace servx;
@@ -18,7 +19,7 @@ static bool init();
 int main(int argc, char* argv[]) {
     if (!init()) {
         Logger::instance()->alert("exit servx...");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     auto conf = ModuleManager::instance()->get_conf<MainCoreModule>();
@@ -27,16 +28,16 @@ int main(int argc, char* argv[]) {
         daemonize();
     }
 
-    Logger::instance()->debug("prepare to spawn process...");
+    servx::signal(SIGPIPE, SIG_IGN);
+
+    for (auto i = 0; i < conf->worker; ++i) {
+        ProcessManager::instance()->push(worker_process_cycle);
+    }
 
     memcpy(argv[0], "servx-worker", sizeof("servx-worker"));
 
-    for (auto i = 0; i < conf->worker; ++i) {
-        // Todo store it
-        Process process(worker_process_cycle);
-        if (!process.run()) {
-            exit(EXIT_FAILURE);
-        }
+    if (!ProcessManager::instance()->spawn()) {
+        exit(EXIT_FAILURE);
     }
 
     memcpy(argv[0], "servx-master", sizeof("servx-master"));

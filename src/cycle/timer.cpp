@@ -20,25 +20,19 @@ void Timer::add_timer(Event* ev, uint32_t delay) {
         del_timer(ev);
     }
 
-    Logger::instance()->debug("add %s timer %p, %ld",
-        ev->is_write_event() ? "wirte" : "read", ev, t);
-
-    timer_tree.insert(timer_tree.cend(), ev);
-
     ev->set_timer(t);
+    timer_tree.insert(timer_tree.cend(), ev);
 }
 
 void Timer::del_timer(Event* ev) {
     auto it = timer_tree.find(ev);
 
     if (it != timer_tree.end()) {
-        Logger::instance()->debug("del %s timer %p, %ld",
-            ev->is_write_event() ? "wirte" : "read", ev, ev->get_timer());
-
         timer_tree.erase(it);
         ev->set_timer(0);
     } else {
-        Logger::instance()->warn("can not find timer");
+        Logger::instance()->warn("can not find timer %p, %ld",
+            ev, ev->get_timer());
     }
 }
 
@@ -47,9 +41,6 @@ void Timer::expire_timer() {
 
     decltype(timer_tree.begin()) it;
     Event *ev;
-
-    Logger::instance()->debug("timer_tree size = %d",
-        timer_tree.size());
 
     while (!timer_tree.empty()) {
         it = timer_tree.begin();
@@ -60,9 +51,6 @@ void Timer::expire_timer() {
         if (ev->get_timer() > now) {
             return;
         }
-
-        Logger::instance()->debug("expire %s timer %p, %ld",
-            ev->is_write_event() ? "wirte" : "read", ev, ev->get_timer());
 
         timer_tree.erase(it);
 
