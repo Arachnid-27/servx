@@ -1,7 +1,6 @@
 #include "server.h"
 
 #include "module_manager.h"
-#include "logger.h"
 #include "http_module.h"
 
 namespace servx {
@@ -30,6 +29,17 @@ Location* Server::find_location(const std::string& uri) {
     // TODO: regex_locations
 
     return prefix_locations.find(uri);
+}
+
+Buffer* Server::get_body_buf() {
+    if (free_body_bufs.empty()) {
+        all_bufs.emplace_back(get_core_conf()->client_body_buffer_size);
+        free_body_bufs.emplace_back(&all_bufs.back());
+    }
+
+    Buffer *buf = free_body_bufs.back();
+    free_body_bufs.pop_back();
+    return buf;
 }
 
 }

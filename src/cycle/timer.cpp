@@ -46,8 +46,6 @@ void Timer::expire_timer() {
         it = timer_tree.begin();
         ev = *it;
 
-        Logger::instance()->debug("%ld %ld", ev->get_timer(), now);
-
         if (ev->get_timer() > now) {
             return;
         }

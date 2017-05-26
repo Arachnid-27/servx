@@ -8,6 +8,13 @@
 
 namespace servx {
 
+Server* HttpListening::get_default_server() {
+    if (default_server == nullptr) {
+        return servers.front();
+    }
+    return default_server;
+}
+
 bool HttpListening::push_server(Server* srv, bool def) {
     if (def) {
         if (default_server != nullptr) {

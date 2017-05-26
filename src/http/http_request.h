@@ -11,6 +11,8 @@
 
 namespace servx {
 
+struct HttpRequestContext;
+
 class HttpRequestBody;
 
 class HttpRequest {
@@ -81,6 +83,12 @@ public:
     HttpResponse* get_response() { return response.get(); }
     HttpRequestBody* get_request_body() { return body.get(); }
 
+    template <typename T>
+    typename T::request_context_t* get_context();
+
+    template <typename T>
+    void set_context(typename T::request_context_t* ctx);
+
     int read_headers();
     void process_line(Event* ev);
     void process_headers(Event* ev);
@@ -92,13 +100,14 @@ private:
     Connection *conn;
     HttpMethod http_method;
     int parse_state;
-    // void** ctx;
     http_req_handler_t read_handler;
     http_req_handler_t write_handler;
     std::unordered_map<std::string, std::string> headers;
 
     std::unique_ptr<HttpRequestBody> body;
     std::unique_ptr<HttpResponse> response;
+
+    std::unnique_ptr<HttpRequestContext> context[NULL_MODULE];
 
     uint32_t phase;
     uint32_t phase_index;
@@ -127,6 +136,16 @@ inline void HttpRequest::get_content_handler(const http_phase_handler_t& h) {
 
 inline void HttpRequest::set_headers_value(std::string&& s) {
     headers.emplace(std::move(name), std::move(s));
+}
+
+template <typename T>
+typename T::request_context_t* HttpRequest::get_context() {
+    return static_cast<typename T::request_context_t*>(context[T::index]);
+}
+
+template <typename T>
+void HttpRequest::set_context(typename T::request_context_t* ctx) {
+    context[T::index] = std::unique_ptr<HttpRequestContext>(ctx);
 }
 
 void http_block_reading(HttpRequest* req);

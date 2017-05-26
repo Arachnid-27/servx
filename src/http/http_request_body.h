@@ -21,10 +21,12 @@ public:
     HttpRequestBody& operator=(const HttpRequestBody&) = delete;
     HttpRequestBody& operator=(HttpRequestBody&&) = delete;
 
-    ~HttpRequestBody() = default;
+    ~HttpRequestBody();
 
     int read(const http_req_handler_t& h);
     int discard();
+
+    bool is_discarded() const { return discarded; }
 
     long get_content_length() const { return content_length; }
     void set_content_length(long n) { content_length = n; }
@@ -37,10 +39,8 @@ private:
     int handle_discard();
 
     HttpRequest *req;
-    std::list<Buffer> body;
+    std::list<Buffer*> body_buffer;
     http_req_handler_t handler;
-
-    std::unique_ptr<Buffer> discard_buffer;
 
     uint32_t discarded:1;
 

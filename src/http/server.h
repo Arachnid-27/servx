@@ -35,6 +35,10 @@ public:
 
     Location* find_location(const std::string& uri);
 
+    Buffer* get_body_buf();
+
+    void ret_body_buf(Buffer* buf) { free_body_bufs.push_back(buf); }
+
     template <typename T>
     typename T::srv_conf_t* get_conf();
 
@@ -44,6 +48,8 @@ private:
     std::unordered_set<std::string> server_names;
     std::vector<std::unique_ptr<Location>> regex_locations;
     LocationTree prefix_locations;
+    std::vector<Buffer> all_bufs;
+    std::vector<Buffer*> free_body_bufs;
     std::unique_ptr<ModuleConf> confs[NULL_MODULE];
 };
 

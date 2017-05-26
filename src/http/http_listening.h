@@ -21,7 +21,7 @@ public:
 
     Server* search_server(const std::string& name);
 
-    Server* get_default_server() { return default_server; }
+    Server* get_default_server();
 
     static void init_connection(Connection* conn);
 

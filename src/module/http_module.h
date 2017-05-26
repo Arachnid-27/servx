@@ -18,12 +18,14 @@ protected:
         : Module(HTTP_MODULE, v) {}
 };
 
-template <typename Main, typename Srv, typename Loc, int Index>
+template <typename Main, typename Srv, typename Loc,
+          int Index, typename Context = void>
 class HttpModuleWithConf: public ModuleWithConf<HttpModule, Main, Index> {
 public:
     using main_conf_t = Main;
     using srv_conf_t = Srv;
     using loc_conf_t = Loc;
+    using request_context_t = Context;
 
     ModuleConf* create_srv_conf() override {
         return __conf_creator<Srv, ModuleConf>().create();

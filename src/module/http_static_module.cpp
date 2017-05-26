@@ -14,7 +14,8 @@ bool HttpStaticModule::post_configuration() {
 
 int HttpStaticModule::http_static_handler(HttpRequest* req) {
     if (req->get_http_method() != HTTP_METHOD_GET &&
-        req->get_http_method() != HTTP_METHOD_HEAD) {
+        req->get_http_method() != HTTP_METHOD_HEAD &&
+        req->get_http_method() != HTTP_METHOD_POST) {
         return HTTP_NOT_ALLOWED;
     }
 
@@ -68,6 +69,7 @@ int HttpStaticModule::http_static_handler(HttpRequest* req) {
     }
 
     if (req->get_request_body()->discard() != SERVX_OK) {
+        Logger::instance()->error("discard request body error");
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 

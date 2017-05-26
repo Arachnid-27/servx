@@ -49,8 +49,8 @@ bool Listener::init_listenings() {
 
     std::sort(listenings.begin(), listenings.end(), comp2);
 
-    auto iter = listenings.cbegin();
-    while (iter != listenings.cend()) {
+    auto iter = listenings.begin();
+    while (iter != listenings.end()) {
         auto socket1 = (*iter)->get_socket();
         if (socket1->is_wildcard()) {
             break;
