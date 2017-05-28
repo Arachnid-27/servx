@@ -10,7 +10,7 @@ class ModuleManager {
 public:
     ModuleManager(const ModuleManager&) = delete;
 
-    Command* find_command(const std::string& name) const;
+    Command* find_command(int type, const std::string& name) const;
 
     template <typename T>
     typename T::conf_t* get_conf() const;
@@ -28,7 +28,7 @@ private:
 
     Module* modules[NULL_MODULE];
     // TODO: use double map
-    std::unordered_map<std::string, Command*> commands;
+    std::unordered_map<std::string, Command*> commands[NULL_BLOCK];
 
     static ModuleManager* manager;
 };

@@ -6,6 +6,7 @@
 
 #include "listener.h"
 #include "location.h"
+#include "module.h"
 
 namespace servx {
 

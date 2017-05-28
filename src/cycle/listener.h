@@ -14,8 +14,8 @@ struct ListeningContext {};
 
 class Listening {
 public:
-    Listening(const std::shared_ptr<TcpSocket>& s)
-        : conn(nullptr), socket(s) {}
+    Listening(std::unique_ptr<TcpSocket>&& s)
+        : conn(nullptr), socket(std::move(s)) {}
 
     Listening(const Listening&) = delete;
     Listening(Listening&&) = delete;
@@ -31,7 +31,7 @@ public:
     template <class T>
     void set_context(T* p) { context = std::unique_ptr<T>(p); }
 
-    const std::shared_ptr<TcpSocket>& get_socket() const { return socket; }
+    TcpSocket* get_socket() const { return socket.get(); }
 
     int get_fd() const { return socket->get_fd(); }
 
@@ -44,11 +44,10 @@ public:
     void handle(Connection* c) { handler(c); }
 
 private:
-    // this is listen connection, not connect connection
     Connection *conn;
     std::function<void(Connection*)> handler;
     std::unique_ptr<ListeningContext> context;
-    std::shared_ptr<TcpSocket> socket;
+    std::unique_ptr<TcpSocket> socket;
 };
 
 class Listener {
@@ -60,7 +59,7 @@ public:
 
     ~Listener() = default;
 
-    Listening* push_address(const std::shared_ptr<TcpSocket>& addr);
+    Listening* push_address(std::unique_ptr<TcpSocket>&& socket);
 
     bool init_listenings();
     bool open_listenings();

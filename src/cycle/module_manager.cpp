@@ -5,6 +5,8 @@
 #include "event_module.h"
 #include "http_core_module.h"
 #include "http_static_module.h"
+#include "http_upstream_module.h"
+#include "http_proxy_module.h"
 
 namespace servx {
 
@@ -16,26 +18,27 @@ ModuleManager::ModuleManager() {
     create_module(EpollModule::index, new EpollModule);
     create_module(HttpCoreModule::index, new HttpCoreModule);
     create_module(HttpStaticModule::index, new HttpStaticModule);
+    create_module(HttpUpstreamModule::index, new HttpUpstreamModule);
+    create_module(HttpProxyModule::index, new HttpProxyModule);
 }
 
 void ModuleManager::create_module(int index, Module* module) {
     modules[index] = module;
     for (auto c : module->get_commands()) {
-        // the lastest command will replace old command if have same name
-        commands[c->get_name()] = c;
+        commands[c->get_block_context()][c->get_name()] = c;
     }
 }
 
-Command* ModuleManager::find_command(const std::string& name) const {
-    auto it = commands.find(name);
-    if (it == commands.end()) {
+Command* ModuleManager::find_command(int type, const std::string& name) const {
+    auto it = commands[type].find(name);
+    if (it == commands[type].end()) {
         return nullptr;
     }
     return it->second;
 }
 
 bool ModuleManager::for_each(std::function<bool (Module*)> func) {
-    for (size_t i = 0; i < ModuleIndex::NULL_MODULE; ++i) {
+    for (size_t i = 0; i < NULL_MODULE; ++i) {
         if (!func(modules[i])) {
             return false;
         }

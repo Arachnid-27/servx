@@ -7,7 +7,7 @@
 namespace servx {
 
 class HttpStaticModule
-    : public HttpModuleWithConf<void*, void, void, HTTP_STATIC_MODULE> {
+    : public HttpModuleWithConf<void, void, void, HTTP_STATIC_MODULE> {
 public:
     HttpStaticModule(): HttpModuleWithConf({}) {}
 

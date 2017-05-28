@@ -11,7 +11,7 @@ namespace servx {
 
 Listener* Listener::listener = new Listener;
 
-Listening* Listener::push_address(const std::shared_ptr<TcpSocket>& socket) {
+Listening* Listener::push_address(std::unique_ptr<TcpSocket>&& socket) {
     auto &vec = ports[socket->get_port()];
 
     for (auto &lst : vec) {
@@ -25,7 +25,7 @@ Listening* Listener::push_address(const std::shared_ptr<TcpSocket>& socket) {
         }
     }
 
-    vec.emplace_back(new Listening(socket));
+    vec.emplace_back(new Listening(std::move(socket)));
     listenings.push_back(vec.back().get());
 
     return listenings.back();

@@ -145,7 +145,7 @@ public:
 
 private:
     // temp variables
-    std::shared_ptr<TcpSocket> tcp_socket;
+    std::unique_ptr<TcpSocket> tcp_socket;
     std::string addr;
     std::string port;
     bool default_server;

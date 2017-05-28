@@ -26,13 +26,14 @@ enum ModuleType {
 };
 
 enum CommandBlock {
-    NULL_BLOCK,
     CORE_BLOCK,
     EVENT_BLOCK,
     HTTP_BLOCK,
+    UPSTREAM_BLOCK,
     SERVER_BLOCK,
     LOCATION_BLOCK,
-    ADDRESS_BLOCK
+    ADDRESS_BLOCK,
+    NULL_BLOCK
 };
 
 using command_vals_t = const std::vector<std::string>&;

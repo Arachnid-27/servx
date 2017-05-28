@@ -5,17 +5,18 @@
 #include <string>
 #include <unordered_map>
 
-#include "http_request.h"
 #include "module.h"
 #include "modules.h"
 
 namespace servx {
 
-using http_req_handler_t = std::function<void(HttpRequest*)>;
+//class HttpRequest;
+
+//using http_req_handler_t = std::function<void(HttpRequest*)>;
 
 struct HttpCoreLocConf: public ModuleConf {
     int client_max_body_size;
-    http_req_handler_t handler; // TODO: init
+//    http_req_handler_t handler; // TODO: init
 };
 
 class Location {

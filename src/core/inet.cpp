@@ -4,7 +4,6 @@
 #include <netdb.h>
 #include <netinet/tcp.h>
 #include <unistd.h>
-#include "logger.h"
 
 namespace servx {
 
@@ -51,18 +50,22 @@ TcpSocket::~TcpSocket() {
     }
 }
 
-bool TcpSocket::init_addr(const std::string& s, const std::string& port) {
+bool TcpSocket::init_addr(const std::string& host, const std::string& port,
+    bool resolve) {
     addrinfo *res;
     addrinfo hint;
 
     memset(&hint, 0, sizeof(addrinfo));
     hint.ai_family = AF_UNSPEC;
     hint.ai_socktype = SOCK_STREAM;
-    hint.ai_flags = AI_ADDRCONFIG | AI_NUMERICHOST | AI_NUMERICSERV;
+    hint.ai_flags = AI_ADDRCONFIG | AI_NUMERICSERV;
+    if (!resolve) {
+        hint.ai_flags |= AI_NUMERICHOST;
+    }
 
     // Todo * return ipv6
 
-    if (getaddrinfo(s.c_str(), port.c_str(), &hint, &res) != 0) {
+    if (getaddrinfo(host.c_str(), port.c_str(), &hint, &res) != 0) {
         return false;
     }
 
@@ -72,12 +75,6 @@ bool TcpSocket::init_addr(const std::string& s, const std::string& port) {
     freeaddrinfo(res);
 
     return true;
-}
-
-bool TcpSocket::is_attr_equal(const std::shared_ptr<TcpSocket>& other) {
-    return send_buf == other->send_buf &&
-           recv_buf == other->recv_buf &&
-           backlog == other->backlog;
 }
 
 int TcpSocket::open_socket() {

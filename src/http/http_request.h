@@ -7,11 +7,13 @@
 #include "http.h"
 #include "http_request_body.h"
 #include "http_response.h"
+#include "modules.h"
 #include "server.h"
 
 namespace servx {
 
-struct HttpRequestContext;
+struct HttpRequestContext {
+};
 
 class HttpRequestBody;
 
@@ -107,7 +109,7 @@ private:
     std::unique_ptr<HttpRequestBody> body;
     std::unique_ptr<HttpResponse> response;
 
-    std::unnique_ptr<HttpRequestContext> context[NULL_MODULE];
+    std::unique_ptr<HttpRequestContext> context[NULL_MODULE];
 
     uint32_t phase;
     uint32_t phase_index;

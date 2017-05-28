@@ -51,7 +51,7 @@ int HttpCoreModule::address_handler(command_vals_t v) {
         }
     }
 
-    tcp_socket = std::make_shared<TcpSocket>();
+    tcp_socket = std::unique_ptr<TcpSocket>(new TcpSocket());
     return ADDRESS_BLOCK;
 }
 
@@ -115,7 +115,7 @@ bool HttpCoreModule::address_post_handler() {
         return false;
     }
 
-    auto lst = Listener::instance()->push_address(tcp_socket);
+    auto lst = Listener::instance()->push_address(std::move(tcp_socket));
     if (lst == nullptr) {
         return false;
     }

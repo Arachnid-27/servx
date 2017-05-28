@@ -28,11 +28,12 @@ bool ConfParser::parse() {
 }
 
 bool ConfParser::process(const ConfItem& item, int block) {
-    auto cmd = ModuleManager::instance()->find_command(item.get_name());
+    auto cmd = ModuleManager::instance()
+        ->find_command(block, item.get_name());
 
     if (cmd == nullptr) {
-        Logger::instance()->error("can not find command %s",
-            item.get_name().c_str());
+        Logger::instance()->error("can not find command %s in block %d",
+            item.get_name().c_str(), block);
         return false;
     }
 
@@ -53,7 +54,8 @@ bool ConfParser::process(const ConfItem& item, int block) {
 
     int rc = cmd->execute(v);
 
-    if (rc == STATE_ERROR) {
+    if (rc == SERVX_ERROR) {
+        Logger::instance()->error("execute %s error", item.get_name().c_str());
         return false;
     }
 
@@ -65,6 +67,7 @@ bool ConfParser::process(const ConfItem& item, int block) {
         }
 
         if (!cmd->post_execute()) {
+            Logger::instance()->error("post execute %s error", item.get_name().c_str());
             return false;
         }
     }

@@ -66,13 +66,14 @@ public:
     bool is_deferred_accept() const { return deferred_accept; }
     void set_deferred_accept(bool d) { deferred_accept = d; }
 
-    bool is_attr_equal(const std::shared_ptr<TcpSocket>& other);
-    bool is_addr_equal(const std::shared_ptr<TcpSocket>& other);
+    bool is_attr_equal(TcpSocket* other);
+    bool is_addr_equal(TcpSocket* other);
     bool is_addr_equal(const sockaddr* other);
 
     bool is_wildcard() const { return addr.is_wildcard(); }
 
-    bool init_addr(const std::string& s, const std::string& port);
+    bool init_addr(const std::string& host, const std::string& port,
+        bool resolve = false);
 
     int open_socket();
 
@@ -88,8 +89,13 @@ private:
     bool deferred_accept;
 };
 
-inline bool TcpSocket::is_addr_equal(
-    const std::shared_ptr<TcpSocket>& other) {
+inline bool TcpSocket::is_attr_equal(TcpSocket* other) {
+    return send_buf == other->send_buf &&
+           recv_buf == other->recv_buf &&
+           backlog == other->backlog;
+}
+
+inline bool TcpSocket::is_addr_equal(TcpSocket* other) {
     return memcmp(addr.get_sockaddr(),
                   other->addr.get_sockaddr(), addr.get_length()) == 0;
 }
