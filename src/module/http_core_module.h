@@ -112,7 +112,7 @@ public:
     int port_handler(command_vals_t v);
 
     int backlog_handler(command_vals_t v) {
-        return set_conf_int<TcpSocket, &TcpSocket::set_backlog>(
+        return set_conf_int<TcpListenSocket, &TcpListenSocket::set_backlog>(
             tcp_socket.get(), v[0]);
     }
 
@@ -145,7 +145,7 @@ public:
 
 private:
     // temp variables
-    std::unique_ptr<TcpSocket> tcp_socket;
+    std::unique_ptr<TcpListenSocket> tcp_socket;
     std::string addr;
     std::string port;
     bool default_server;

@@ -57,9 +57,6 @@ enum HttpStateCode {
     HTTP_GATEWAY_TIME_OUT           // 504
 };
 
-void http_empty_read_handler(Event*);
-void http_empty_write_handler(Event*);
-
 }
 
 #endif

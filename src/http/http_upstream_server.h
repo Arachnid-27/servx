@@ -7,20 +7,20 @@ namespace servx {
 
 class HttpUpstreamServer {
 public:
-    HttpUpstreamServer(std::unique_ptr<TcpSocket>&& s)
+    HttpUpstreamServer(std::unique_ptr<TcpConnectSocket>&& s)
         : socket(std::move(s)) {}
 
     HttpUpstreamServer(const HttpUpstreamServer&) = delete;
-    HttpUpstreamServer(HttpUpstreamServer&&) = delete;
+    HttpUpstreamServer(HttpUpstreamServer&&) = default;
     HttpUpstreamServer& operator=(const HttpUpstreamServer&) = delete;
-    HttpUpstreamServer& operator=(HttpUpstreamServer&&) = delete;
+    HttpUpstreamServer& operator=(HttpUpstreamServer&&) = default;
 
     ~HttpUpstreamServer() = default;
 
-    TcpSocket* get_socket() const { return socket.get(); }
+    TcpConnectSocket* get_socket() const { return socket.get(); }
 
 private:
-    std::unique_ptr<TcpSocket> socket;
+    std::unique_ptr<TcpConnectSocket> socket;
 };
 
 }

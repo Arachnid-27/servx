@@ -42,57 +42,47 @@ uint16_t get_port_from_sockaddr(const sockaddr* addr);
 
 class TcpSocket {
 public:
-    TcpSocket();
+    TcpSocket(): fd(-1), send_buf(-1), recv_buf(-1) {}
 
     TcpSocket(const TcpSocket&) = delete;
     TcpSocket(TcpSocket&&) = delete;
     TcpSocket& operator=(const TcpSocket&) = delete;
     TcpSocket& operator=(TcpSocket&&) = delete;
 
-    ~TcpSocket();
-
-    bool set_addr(const std::string& s);
+    virtual ~TcpSocket();
 
     int get_fd() const { return fd; }
 
+    sockaddr* get_addr() { return addr.get_sockaddr(); }
     uint16_t get_port() { return addr.get_port(); }
 
-    void set_backlog(int s) { backlog = s; }
-
     void set_send_buf(int s) { send_buf = s; }
-
     void set_recv_buf(int s) { recv_buf = s; }
 
-    bool is_deferred_accept() const { return deferred_accept; }
-    void set_deferred_accept(bool d) { deferred_accept = d; }
-
-    bool is_attr_equal(TcpSocket* other);
     bool is_addr_equal(TcpSocket* other);
     bool is_addr_equal(const sockaddr* other);
 
     bool is_wildcard() const { return addr.is_wildcard(); }
 
-    bool init_addr(const std::string& host, const std::string& port,
+    int init_addr(const std::string& host, const std::string& port,
         bool resolve = false);
 
-    int open_socket();
+    int close();
 
-private:
-    bool close_socket();
+protected:
+    void set_base_attr();
+    bool is_base_attr_equal(TcpSocket* other);
 
-private:
     IPSockAddr addr;
+    int fd;
+
+private:
     int send_buf;
     int recv_buf;
-    int backlog;
-    int fd;
-    bool deferred_accept;
 };
 
-inline bool TcpSocket::is_attr_equal(TcpSocket* other) {
-    return send_buf == other->send_buf &&
-           recv_buf == other->recv_buf &&
-           backlog == other->backlog;
+inline bool TcpSocket::is_base_attr_equal(TcpSocket* other) {
+    return send_buf == other->send_buf && recv_buf == other->recv_buf;
 }
 
 inline bool TcpSocket::is_addr_equal(TcpSocket* other) {
@@ -103,6 +93,42 @@ inline bool TcpSocket::is_addr_equal(TcpSocket* other) {
 inline bool TcpSocket::is_addr_equal(const sockaddr* other) {
     return memcmp(addr.get_sockaddr(), other, addr.get_length()) == 0;
 }
+
+class TcpListenSocket: public TcpSocket {
+public:
+    TcpListenSocket(): backlog(5), deferred_accept(false) {}
+
+    ~TcpListenSocket() override = default;
+
+    void set_backlog(int s) { backlog = s; }
+
+    bool is_deferred_accept() const { return deferred_accept; }
+    void set_deferred_accept(bool d) { deferred_accept = d; }
+
+    bool is_attr_equal(TcpListenSocket* other);
+
+    int listen();
+
+private:
+    int backlog;
+    bool deferred_accept;
+};
+
+inline bool TcpListenSocket::is_attr_equal(TcpListenSocket* other) {
+    return is_base_attr_equal(other) && backlog == other->backlog;
+}
+
+class TcpConnectSocket: public TcpSocket {
+public:
+    TcpConnectSocket() = default;
+
+    ~TcpConnectSocket() override = default;
+
+    int connect();
+
+private:
+    bool connecting;
+};
 
 }
 

@@ -269,7 +269,7 @@ void HttpRequest::close(int status) {
         conn->get_read_event()->set_handler([hc](Event* ev)
             { hc->wait_request(ev); });
         conn->get_write_event()->set_ready(false);
-        conn->get_write_event()->set_handler(http_empty_write_handler);
+        conn->get_write_event()->set_handler(empty_write_handler);
         hc->close_request();
     }
 }

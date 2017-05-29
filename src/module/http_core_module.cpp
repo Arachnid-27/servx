@@ -51,7 +51,7 @@ int HttpCoreModule::address_handler(command_vals_t v) {
         }
     }
 
-    tcp_socket = std::unique_ptr<TcpSocket>(new TcpSocket());
+    tcp_socket = std::unique_ptr<TcpListenSocket>(new TcpListenSocket());
     return ADDRESS_BLOCK;
 }
 
@@ -111,12 +111,14 @@ bool HttpCoreModule::server_post_handler() {
 }
 
 bool HttpCoreModule::address_post_handler() {
-    if (!tcp_socket->init_addr(addr, port)) {
+    if (tcp_socket->init_addr(addr, port) == SERVX_ERROR) {
+        Logger::instance()->error("[address]: init address error");
         return false;
     }
 
     auto lst = Listener::instance()->push_address(std::move(tcp_socket));
     if (lst == nullptr) {
+        Logger::instance()->error("[address]: push address error");
         return false;
     }
 

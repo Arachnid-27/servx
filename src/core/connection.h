@@ -61,6 +61,9 @@ private:
     std::function<void(Event*)> handler;
 };
 
+void empty_read_handler(Event*);
+void empty_write_handler(Event*);
+
 struct ConnectionContext {};
 
 class Connection {
@@ -78,8 +81,6 @@ public:
     void close();
 
     bool is_close() const { return socket_fd == -1; }
-
-    void set_peer_sockaddr(sockaddr* sa, socklen_t len);
 
     sockaddr* get_local_sockaddr() { return local_addr.get_sockaddr(); }
 
@@ -114,7 +115,6 @@ public:
 private:
     uint64_t conn_id;
     int socket_fd;
-    IPSockAddr peer_addr;
     IPSockAddr local_addr;
     Event read_event;
     Event write_event;
@@ -130,10 +130,6 @@ private:
 
 inline int Connection::recv_data() {
     return recv_data(recv_buf.get(), recv_buf->get_remain());
-}
-
-inline void Connection::set_peer_sockaddr(sockaddr* sa, socklen_t len) {
-    peer_addr.set_addr(sa, len);
 }
 
 }

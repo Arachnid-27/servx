@@ -75,7 +75,6 @@ void accept_event_handler(Listening* lst, Event* ev) {
             return;
         }
 
-        new_conn->set_peer_sockaddr(&sa, len);
         new_conn->get_write_event()->set_ready(true); // enable write event
         if (lst->get_socket()->is_deferred_accept()) {
             new_conn->get_read_event()->set_ready(true);

@@ -4,7 +4,7 @@ namespace servx {
 
 bool HttpUpstream::push_server(
     const std::string& host, const std::string& port) {
-    std::unique_ptr<TcpSocket> socket(new TcpSocket());
+    std::unique_ptr<TcpConnectSocket> socket(new TcpConnectSocket());
     if (!socket->init_addr(host, port, true)) {
         return false;
     }

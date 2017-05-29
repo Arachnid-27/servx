@@ -33,6 +33,10 @@ void Event::reset() {
     eof = 0;
 }
 
+void empty_read_handler(Event*) {}
+
+void empty_write_handler(Event*) {}
+
 uint64_t Connection::count = 0;
 
 Connection::Connection()

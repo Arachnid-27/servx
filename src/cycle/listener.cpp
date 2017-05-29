@@ -11,7 +11,7 @@ namespace servx {
 
 Listener* Listener::listener = new Listener;
 
-Listening* Listener::push_address(std::unique_ptr<TcpSocket>&& socket) {
+Listening* Listener::push_address(std::unique_ptr<TcpListenSocket>&& socket) {
     auto &vec = ports[socket->get_port()];
 
     for (auto &lst : vec) {
@@ -79,7 +79,7 @@ bool Listener::open_listenings() {
     Connection *conn;
 
     for (auto lst : listenings) {
-        int fd = lst->open_socket();
+        int fd = lst->listen();
         if (fd == -1) {
             Logger::instance()->error("open socket failed, errno %d", errno);
             return false;

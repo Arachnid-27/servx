@@ -5,6 +5,8 @@
 #include <netinet/tcp.h>
 #include <unistd.h>
 
+#include "core.h"
+
 namespace servx {
 
 void IPSockAddr::set_addr(sockaddr *sa, uint8_t len) {
@@ -40,17 +42,13 @@ uint16_t get_port_from_sockaddr(const sockaddr* addr) {
     return reinterpret_cast<const sockaddr_in*>(addr)->sin_port;
 }
 
-TcpSocket::TcpSocket()
-    : send_buf(-1), recv_buf(-1),
-      backlog(5), fd(-1), deferred_accept(false) {}
-
 TcpSocket::~TcpSocket() {
     if (fd != -1) {
-        close_socket();
+        close();
     }
 }
 
-bool TcpSocket::init_addr(const std::string& host, const std::string& port,
+int TcpSocket::init_addr(const std::string& host, const std::string& port,
     bool resolve) {
     addrinfo *res;
     addrinfo hint;
@@ -66,7 +64,7 @@ bool TcpSocket::init_addr(const std::string& host, const std::string& port,
     // Todo * return ipv6
 
     if (getaddrinfo(host.c_str(), port.c_str(), &hint, &res) != 0) {
-        return false;
+        return SERVX_ERROR;
     }
 
     // just use the first one
@@ -74,10 +72,34 @@ bool TcpSocket::init_addr(const std::string& host, const std::string& port,
 
     freeaddrinfo(res);
 
-    return true;
+    return SERVX_OK;
 }
 
-int TcpSocket::open_socket() {
+void TcpSocket::set_base_attr() {
+    if (recv_buf != -1 &&
+        setsockopt(fd, SOL_SOCKET, SO_RCVBUF,
+                   &recv_buf, sizeof(int)) == -1) {
+        // err_log
+    }
+
+    if (send_buf != -1 &&
+        setsockopt(fd, SOL_SOCKET, SO_SNDBUF,
+                   &send_buf, sizeof(int)) == -1) {
+        // err_log
+    }
+}
+
+int TcpSocket::close() {
+    if (::close(fd) == -1) {
+        // err_log
+        fd = -1;
+        return SERVX_ERROR;
+    }
+    fd = -1;
+    return SERVX_OK;
+}
+
+int TcpListenSocket::listen()  {
     if (fd != -1) {
         return fd;
     }
@@ -86,10 +108,10 @@ int TcpSocket::open_socket() {
 
     for (size_t i = 0; i < 5; ++i) {
         if (fd == -1) {
-            fd = socket(AF_INET ,SOCK_STREAM | SOCK_NONBLOCK, 0);
+            fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
 
             if (fd == -1) {
-                return -1;
+                return SERVX_ERROR;
             }
 
             if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR,
@@ -113,20 +135,8 @@ int TcpSocket::open_socket() {
             break;
         }
 
-        if (listen(fd, backlog) == -1) {
+        if (::listen(fd, backlog) == -1) {
             break;
-        }
-
-        if (recv_buf != -1 &&
-            setsockopt(fd, SOL_SOCKET, SO_RCVBUF,
-                       &recv_buf, sizeof(int)) == -1) {
-            // err_log
-        }
-
-        if (send_buf != -1 &&
-            setsockopt(fd, SOL_SOCKET, SO_SNDBUF,
-                       &send_buf, sizeof(int)) == -1) {
-            // err_log
         }
 
         if (deferred_accept &&
@@ -136,19 +146,46 @@ int TcpSocket::open_socket() {
             deferred_accept = false;
         }
 
+        set_base_attr();
         return fd;
     }
 
-    close_socket();
-    return -1;
+    ::close(fd);
+    return SERVX_ERROR;
 }
 
-bool TcpSocket::close_socket() {
-    if (close(fd) == -1) {
-        // err_log
-        return false;
+int TcpConnectSocket::connect() {
+    if (fd != -1) {
+        return fd;
     }
-    return true;
+
+    fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+
+    if (fd == -1) {
+        return SERVX_ERROR;
+    }
+
+    while (true) {
+        int rc = ::connect(fd, addr.get_sockaddr(), addr.get_length());
+
+        if (rc == 0) {
+            set_base_attr();
+            return fd;
+        }
+
+        int err = errno;
+
+        if (err == EAGAIN) {
+            return SERVX_AGAIN;
+        }
+
+        if (err != EINTR) {
+            return SERVX_ERROR;
+        }
+    }
+
+    ::close(fd);
+    return SERVX_ERROR;
 }
 
 }
