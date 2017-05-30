@@ -15,7 +15,7 @@ public:
     HttpListening& operator=(const Server&) = delete;
     HttpListening& operator=(Server&&) = delete;
 
-    ~HttpListening() = default;
+    ~HttpListening() override = default;
 
     bool push_server(Server* srv, bool def);
 

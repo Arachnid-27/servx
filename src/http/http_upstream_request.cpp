@@ -8,6 +8,12 @@
 
 namespace servx {
 
+HttpUpstreamRequest::~HttpUpstreamRequest() {
+    for (Buffer *buf : response_bufs) {
+        server->ret_body_buf(buf);
+    }
+}
+
 void HttpUpstreamRequest::close(int rc) {
     // TODO: keep-alive
     finalize_handler(rc);
@@ -97,9 +103,7 @@ void HttpUpstreamRequest::recv_response_handler(Event* ev) {
         return;
     }
 
-    // TODO: custom && get from server
-    // it cause memory leak now, we will fix it soon
-    response_bufs.emplace_back(new Buffer(4096));
+    response_bufs.emplace_back(server->get_body_buf());
 
     int n, rc, size;
 
@@ -132,7 +136,7 @@ void HttpUpstreamRequest::recv_response_handler(Event* ev) {
         }
 
         if (n == size) {
-            response_bufs.emplace_back(new Buffer(4096));
+            response_bufs.emplace_back(server->get_body_buf());
             continue;
         }
 

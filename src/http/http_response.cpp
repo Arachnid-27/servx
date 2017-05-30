@@ -42,7 +42,9 @@ std::string HttpResponse::status_lines[] = {
 
 HttpResponse::HttpResponse(Connection* c)
     : conn(c), content_length(-1),
-      last_modified_time(-1), status(-1) {
+      last_modified_time(-1), status(-1),
+      header_only(false), chunked(false),
+      keep_alive(false), etag(false) {
 }
 
 int HttpResponse::send_header() {

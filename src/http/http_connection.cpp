@@ -40,14 +40,13 @@ void HttpConnection::wait_request(Event* ev) {
 
     ConnectionPool::instance()->disable_reusable(conn);
 
-    HttpRequest *req = new HttpRequest(conn);
-    request = std::unique_ptr<HttpRequest>(req);
+    request = std::unique_ptr<HttpRequest>(new HttpRequest(conn));
     request->set_server(srv);
 
     Logger::instance()->debug("prepare to process request line");
 
-    ev->set_handler([req](Event* ev) { req->process_line(ev); });
-    req->process_line(ev);
+    ev->set_handler([&](Event* ev) { request->process_line(ev); });
+    request->process_line(ev);
 }
 
 }

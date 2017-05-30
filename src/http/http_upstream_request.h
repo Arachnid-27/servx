@@ -25,7 +25,7 @@ public:
     HttpUpstreamRequest& operator=(const HttpUpstreamRequest&) = delete;
     HttpUpstreamRequest& operator=(HttpUpstreamRequest&&) = delete;
 
-    ~HttpUpstreamRequest() = default;
+    ~HttpUpstreamRequest();
 
     int connect();
 

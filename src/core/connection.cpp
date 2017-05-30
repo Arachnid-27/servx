@@ -41,7 +41,8 @@ uint64_t Connection::count = 0;
 
 Connection::Connection()
     : socket_fd(-1), read_event(this, false),
-      write_event(this, true) {
+      write_event(this, true), listen(false),
+      timeout(false), error(false) {
 }
 
 bool Connection::open(int fd, bool lst) {

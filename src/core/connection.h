@@ -64,7 +64,9 @@ private:
 void empty_read_handler(Event*);
 void empty_write_handler(Event*);
 
-struct ConnectionContext {};
+struct ConnectionContext {
+    virtual ~ConnectionContext() {}
+};
 
 class Connection {
 public:
@@ -94,9 +96,11 @@ public:
     bool is_listen() const { return listen; }
 
     template <class T>
-    void set_context(T* c) { ctx = std::unique_ptr<T>(c); }
-    template <class T>
     T* get_context() const { return static_cast<T*>(ctx.get());}
+
+    void set_context(ConnectionContext* p) {
+        ctx = std::unique_ptr<ConnectionContext>(p);
+    }
 
     Buffer* get_recv_buf() const { return recv_buf.get(); }
     void init_recv_buf(int sz);

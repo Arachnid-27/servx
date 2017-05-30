@@ -14,7 +14,8 @@ class HttpRequestBody {
 public:
     using http_req_handler_t = std::function<void(HttpRequest*)>;
 
-    HttpRequestBody(HttpRequest* r): req(r), content_length(-1), recv(0) {}
+    explicit HttpRequestBody(HttpRequest* r)
+        : req(r), discarded(false), content_length(-1), recv(0) {}
 
     HttpRequestBody(const HttpRequestBody&) = delete;
     HttpRequestBody(HttpRequestBody&&) = delete;

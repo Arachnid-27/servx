@@ -4,6 +4,8 @@
 #include "http_listening.h"
 #include "http_request.h"
 
+#include "logger.h"
+
 namespace servx {
 
 class HttpConnection: public ConnectionContext {
@@ -14,6 +16,8 @@ public:
     HttpConnection(HttpConnection&&);
     HttpConnection& operator=(const HttpConnection&);
     HttpConnection& operator=(HttpConnection&&);
+
+    ~HttpConnection() override = default;
 
     HttpListening* get_listening() const { return listening; }
 

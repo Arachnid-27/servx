@@ -1,6 +1,7 @@
 #ifndef _HTTP_UPSTREAM_SERVER_H_
 #define _HTTP_UPSTREAM_SERVER_H_
 
+#include "buffer.h"
 #include "inet.h"
 
 namespace servx {
@@ -19,8 +20,14 @@ public:
 
     TcpConnectSocket* get_socket() const { return socket.get(); }
 
+    Buffer* get_body_buf();
+
+    void ret_body_buf(Buffer* buf) { free_body_bufs.push_back(buf); }
+
 private:
     std::unique_ptr<TcpConnectSocket> socket;
+    std::vector<Buffer> all_bufs;
+    std::vector<Buffer*> free_body_bufs;
 };
 
 }

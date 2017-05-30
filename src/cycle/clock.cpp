@@ -16,6 +16,8 @@ const char* Clock::months[] =
 Clock* Clock::clock = new Clock;
 
 Clock::Clock(): cur(0) {
+    milliseconds[0] = 0;
+    milliseconds[1] = 0;
     log_time[0] = "1970/01/01 00:00:00";
     log_time[1] = "1970/01/01 00:00:00";
     http_time[0] = "Thu, 01 Jan 1970 00:00:00 GMT";

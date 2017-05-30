@@ -10,7 +10,9 @@
 
 namespace servx {
 
-struct ListeningContext {};
+struct ListeningContext {
+    virtual ~ListeningContext() {}
+};
 
 class Listening {
 public:
@@ -28,8 +30,10 @@ public:
 
     template <class T>
     T* get_context() { return static_cast<T*>(context.get()); }
-    template <class T>
-    void set_context(T* p) { context = std::unique_ptr<T>(p); }
+
+    void set_context(ListeningContext* p) {
+        context = std::unique_ptr<ListeningContext>(p);
+    }
 
     TcpListenSocket* get_socket() const { return socket.get(); }
 
