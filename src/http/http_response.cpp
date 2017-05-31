@@ -47,6 +47,12 @@ HttpResponse::HttpResponse(Connection* c)
       keep_alive(false), etag(false) {
 }
 
+HttpResponse::~HttpResponse() {
+    std::for_each(out.begin(), out.end(), [this](Sendable& s)
+        { std::for_each(s.chain.begin(), s.chain.end(), [this](Buffer* b)
+            { server->ret_body_buf(b); }); });
+}
+
 int HttpResponse::send_header() {
     if (status == -1) {
         return SERVX_ERROR;
@@ -64,12 +70,14 @@ int HttpResponse::send_header() {
 
     out.emplace_back();
 
-    std::list<Buffer> &chain = out.back().chain;
-    chain.emplace_back(4096);
+    std::list<Buffer*> &chain = out.back().chain;
+    chain.emplace_back(server->get_body_buf());
 
     int n;
-    Buffer *buf = &chain.back();
+    Buffer *buf = chain.back();
     char *pos = buf->get_pos();
+
+    Logger::instance()->debug("%p ", pos);
 
     n = sprintf(pos, "HTTP/1.1 %s\r\n", status_lines[status - 10].c_str());
     pos += n;
@@ -131,8 +139,8 @@ int HttpResponse::send_header() {
         // but we should discard the last result (don't invoke set_last)
         // becase we don't know if it is truncated
         if (pos + n == buf->get_end()) {
-            chain.emplace_back(4096);
-            buf = &chain.back();
+            chain.emplace_back(server->get_body_buf());
+            buf = chain.back();
             pos = buf->get_pos();
             n = snprintf(pos, buf->get_remain(), "%s:%s\r\n",
                          s.first.c_str(), s.second.c_str());
@@ -143,8 +151,8 @@ int HttpResponse::send_header() {
     }
 
     if (buf->get_remain() < 2) {
-        chain.emplace_back(2);
-        buf = &chain.back();
+        chain.emplace_back(server->get_body_buf());
+        buf = chain.back();
         pos = buf->get_pos();
     }
 
@@ -153,22 +161,19 @@ int HttpResponse::send_header() {
 
     buf->set_last(pos + 2);
 
-    int rc = conn->send_chain(chain);
-
-    if (rc == SERVX_ERROR) {
-        return SERVX_ERROR;
-    }
-
-    return rc == SERVX_OK ? SERVX_OK : SERVX_AGAIN;
+    return send();
 }
 
 int HttpResponse::send_body(std::unique_ptr<File>&& p) {
+    if (out.empty()) {
+        out.emplace_back();
+    }
     std::list<std::unique_ptr<File>> &files = out.back().files;
     files.emplace_back(std::move(p));
     return send();
 }
 
-int HttpResponse::send_body(std::list<Buffer>&& chain) {
+int HttpResponse::send_body(std::list<Buffer*>&& chain) {
     if (!out.back().files.empty()) {
         out.emplace_back();
     }
@@ -184,11 +189,20 @@ int HttpResponse::send() {
         auto &chain = out.front().chain;
 
         if (!chain.empty()) {
-            rc = conn->send_chain(chain);
-            if (rc == SERVX_ERROR) {
+            auto first = chain.begin();
+            auto last = chain.end();
+            auto iter = conn->send_chain(first, last);
+            if (conn->is_error()) {
+                Logger::instance()->info("connection error");
                 return SERVX_ERROR;
             }
-            if (rc != SERVX_OK) {
+
+            sent = 1;
+            std::for_each(first, iter,
+                [this](Buffer* buf) { server->ret_body_buf(buf); });
+            chain.erase(first, iter);
+
+            if (iter != last) {
                 return SERVX_AGAIN;
             }
         }
@@ -209,7 +223,7 @@ int HttpResponse::send() {
                     iter = files.erase(iter);
                 }
             } else {
-                chain.emplace_back(4096);
+                chain.emplace_back(server->get_body_buf());
                 auto iter = files.begin();
                 while (!files.empty()) {
                     // TODO: read partical && write
@@ -217,8 +231,8 @@ int HttpResponse::send() {
                         return SERVX_ERROR;
                     }
 
-                    rc = io_read((*iter)->get_fd(), chain.back().get_last(),
-                        chain.back().get_remain());
+                    rc = io_read((*iter)->get_fd(), chain.back()->get_last(),
+                        chain.back()->get_remain());
 
                     if (rc < 0) {
                         return rc;
@@ -230,13 +244,13 @@ int HttpResponse::send() {
 
                     int bytes = (*iter)->get_offset() + rc;
                     (*iter)->set_offset(bytes);
-                    chain.back().move_last(rc);
+                    chain.back()->move_last(rc);
 
                     if (bytes == (*iter)->get_file_size()) {
                         iter = files.erase(iter);
                         continue;
-                    } else if (chain.back().get_remain() == 0) {
-                        chain.emplace_back(4096);
+                    } else if (chain.back()->get_remain() == 0) {
+                        chain.emplace_back(server->get_body_buf());
                         continue;
                     } else {
                         break;

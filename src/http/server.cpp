@@ -2,6 +2,7 @@
 
 #include "module_manager.h"
 #include "http_module.h"
+#include "logger.h"
 
 namespace servx {
 
@@ -39,7 +40,19 @@ Buffer* Server::get_body_buf() {
 
     Buffer *buf = free_body_bufs.back();
     free_body_bufs.pop_back();
+
+    Logger::instance()->debug("[http server %p] get buf %p, total %d, left %d",
+        this, buf, all_bufs.size(), free_body_bufs.size());
+
     return buf;
+}
+
+void Server::ret_body_buf(Buffer* buf) {
+    buf->reset();
+    free_body_bufs.push_back(buf);
+
+    Logger::instance()->debug("[http server %p] ret buf %p, total %d, left %d",
+        this, buf, all_bufs.size(), free_body_bufs.size());
 }
 
 }

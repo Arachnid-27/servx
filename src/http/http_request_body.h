@@ -12,7 +12,7 @@ class HttpRequest;
 
 class HttpRequestBody {
 public:
-    using http_req_handler_t = std::function<void(HttpRequest*)>;
+    using http_req_handler_t = std::function<int(HttpRequest*)>;
 
     explicit HttpRequestBody(HttpRequest* r)
         : req(r), discarded(false), content_length(-1), recv(0) {}
@@ -31,6 +31,8 @@ public:
 
     long get_content_length() const { return content_length; }
     void set_content_length(long n) { content_length = n; }
+
+    std::list<Buffer*>& get_body_buffer() { return body_buffer; }
 
     static void read_request_body_handler(HttpRequest* req);
     static void discard_request_body_handler(HttpRequest* req);

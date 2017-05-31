@@ -8,16 +8,16 @@
 #include "buffer.h"
 #include "connection.h"
 #include "http_upstream_server.h"
+#include "http_request.h"
 
 namespace servx {
 
 class HttpUpstreamRequest {
 public:
-    HttpUpstreamRequest(HttpUpstreamServer* srv,
-        std::string&& m, std::string&& u, std::string&& a,
-        const std::function<int(Buffer*)>& rh,
-        const std::function<void(int)>& fh)
-        : server(srv), method(m), uri(u), args(a),
+    HttpUpstreamRequest(HttpUpstreamServer* srv, HttpRequest* req,
+        const std::function<int(HttpRequest*, Buffer*)>& rh,
+        const std::function<void(HttpRequest*, int)>& fh)
+        : server(srv), request(req),
           response_handler(rh), finalize_handler(fh) {}
 
     HttpUpstreamRequest(const HttpUpstreamRequest&) = delete;
@@ -29,9 +29,9 @@ public:
 
     int connect();
 
-    void set_body(std::list<Buffer>&& b) { request_bufs = std::move(b); }
-    void set_args(std::string&& a) { args = a; }
-    void set_headers(std::string&& k, std::string&& v) { headers[k] = v; }
+    void set_extra_headers(const std::string& k, const std::string& v) {
+        extra_headers[k] = v;
+    }
 
     void wait_connect_handler(Event* ev);
 
@@ -41,21 +41,20 @@ public:
     void close(int rc);
 
 private:
+    void build_request();
     int send_request();
 
     HttpUpstreamServer* server;
+    HttpRequest *request;
     Connection* conn;
 
-    std::string method;
-    std::string uri;
-    std::string args;
-
-    std::unordered_map<std::string, std::string> headers;
-    std::list<Buffer> request_bufs;
+    std::unordered_map<std::string, std::string> extra_headers;
+    std::list<Buffer*> request_header_bufs;
+    std::list<Buffer*> request_body_bufs;
     std::list<Buffer*> response_bufs;
 
-    std::function<int(Buffer*)> response_handler;
-    std::function<void(int)> finalize_handler;
+    std::function<int(HttpRequest*, Buffer*)> response_handler;
+    std::function<void(HttpRequest*, int)> finalize_handler;
 };
 
 }

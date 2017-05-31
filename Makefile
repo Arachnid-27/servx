@@ -1,6 +1,6 @@
 CC := g++
 HDR := ./src ./src/core ./src/module ./src/cycle ./src/http
-CFLAGS := -std=c++11 -Wall -g $(HDR:%=-I %)
+CFLAGS := -std=c++11 -Wall -O2 $(HDR:%=-I %)
 SRC := $(wildcard ./src/*.cpp ./src/core/*.cpp ./src/module/*.cpp ./src/cycle/*.cpp ./src/http/*.cpp)
 OBJ := $(SRC:%.cpp=%.o)
 EXE := servx

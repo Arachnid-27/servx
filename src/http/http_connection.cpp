@@ -42,6 +42,7 @@ void HttpConnection::wait_request(Event* ev) {
 
     request = std::unique_ptr<HttpRequest>(new HttpRequest(conn));
     request->set_server(srv);
+    request->get_response()->set_server(srv);
 
     Logger::instance()->debug("prepare to process request line");
 

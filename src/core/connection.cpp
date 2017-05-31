@@ -5,9 +5,7 @@
 #include <cstring>
 
 #include "connection_pool.h"
-#include "core.h"
 #include "event_module.h"
-#include "io.h"
 #include "logger.h"
 #include "timer.h"
 
@@ -119,54 +117,6 @@ int Connection::recv_data(Buffer* buf, uint32_t count) {
 
     read_event.set_ready(false);
     return n;
-}
-
-int Connection::send_chain(std::list<Buffer>& chain) {
-    struct iovec iovs[64];
-    int total, cnt;
-
-    while (!chain.empty()) {
-        total = cnt = 0;
-
-        for (auto &buf : chain) {
-            iovs[cnt].iov_base = static_cast<void*>(buf.get_pos());
-            iovs[cnt].iov_len = buf.get_size();
-            total += buf.get_size();
-            if (++cnt == 64) {
-                break;
-            }
-        }
-
-        int n = io_write_chain(socket_fd, iovs, cnt);
-
-        if (n > 0) {
-            auto iter = chain.begin();
-            if (n < total) {
-                uint32_t num = n;
-                while (iter != chain.end()) {
-                    if (num < iter->get_size()) {
-                        iter->move_pos(num);
-                        break;
-                    }
-                    num -= iter->get_size();
-                    ++iter;
-                }
-                chain.erase(chain.begin(), iter);
-            } else {
-                std::advance(iter, cnt);
-                chain.erase(chain.begin(), iter);
-                continue;
-            }
-        } else if (n == SERVX_ERROR) {
-            error = 1;
-            return SERVX_ERROR;
-        }
-
-        write_event.set_ready(false);
-        return SERVX_AGAIN;
-    }
-
-    return SERVX_OK;
 }
 
 int Connection::send_file(File* file) {

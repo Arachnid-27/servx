@@ -14,4 +14,9 @@ Buffer* HttpUpstreamServer::get_body_buf() {
     return buf;
 }
 
+void HttpUpstreamServer::ret_body_buf(Buffer* buf) {
+    buf->reset();
+    free_body_bufs.push_back(buf);
+}
+
 }

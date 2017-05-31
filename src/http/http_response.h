@@ -7,7 +7,7 @@
 
 #include "file.h"
 #include "http.h"
-#include "location.h"
+#include "server.h"
 
 namespace servx {
 
@@ -20,7 +20,7 @@ public:
     HttpResponse& operator=(const HttpResponse&) = delete;
     HttpResponse& operator=(HttpResponse&&) = delete;
 
-    ~HttpResponse() = default;
+    ~HttpResponse();
 
     template <typename T1, typename T2>
     void set_headers(T1&& name, T2&& value);
@@ -43,24 +43,28 @@ public:
     bool is_keep_alive() const { return keep_alive; }
     void set_keep_alive(bool k) { keep_alive = k; }
 
+    bool is_sent() const { return sent; }
+
     int send_header();
     int send_body(std::unique_ptr<File>&& p);
-    int send_body(std::list<Buffer>&& chain);
+    int send_body(std::list<Buffer*>&& chain);
     int send();
 
     void set_etag(bool e) { etag = e; };
 
+    void set_server(Server* srv) { server = srv; }
     void set_location(Location* loc) { location = loc; }
 
 private:
     struct Sendable {
-        std::list<Buffer> chain;
+        std::list<Buffer*> chain;
         std::list<std::unique_ptr<File>> files;
     };
 
     std::unordered_map<std::string, std::string> headers;
     Connection *conn;
     Location *location;
+    Server *server;
     long content_length;
     long last_modified_time;
     int status;
@@ -69,6 +73,7 @@ private:
     uint32_t chunked:1;
     uint32_t keep_alive:1;
     uint32_t etag:1;
+    uint32_t sent:1;
 
     std::list<Sendable> out;
 

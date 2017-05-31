@@ -13,6 +13,7 @@
 namespace servx {
 
 struct HttpRequestContext {
+    virtual ~HttpRequestContext() {}
 };
 
 class HttpRequestBody;
@@ -44,6 +45,7 @@ public:
 
     const std::string& get_method() const { return method; }
     const std::string& get_uri() const { return uri; }
+    const std::string& get_args() const { return args; }
 
     void handle(Event* ev);
 
@@ -71,7 +73,13 @@ public:
     void set_headers_name(std::string&& s) { name = std::move(s); }
     void set_headers_value(std::string&& s);
 
-    std::string get_headers(const char* s) const;
+    std::string get_header(const char* s) const;
+
+    std::unordered_map<std::string, std::string>::const_iterator
+    headers_begin() const { return headers.cbegin(); };
+
+    std::unordered_map<std::string, std::string>::const_iterator
+    headers_end() const { return headers.cend(); };
 
     uint32_t get_phase() const { return phase; }
     void next_phase() { ++phase; phase_index = 0; }
@@ -142,7 +150,7 @@ inline void HttpRequest::set_headers_value(std::string&& s) {
 
 template <typename T>
 typename T::request_context_t* HttpRequest::get_context() {
-    return static_cast<typename T::request_context_t*>(context[T::index]);
+    return static_cast<typename T::request_context_t*>(context[T::index].get());
 }
 
 template <typename T>

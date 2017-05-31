@@ -6,8 +6,10 @@
 #include <list>
 
 #include "buffer.h"
+#include "core.h"
 #include "file.h"
 #include "inet.h"
+#include "io.h"
 
 namespace servx {
 
@@ -111,10 +113,15 @@ public:
     bool is_error() const { return error; }
     void set_error(bool e) { error = e; }
 
-    int recv_data();
+    int recv_data() {
+        return recv_data(recv_buf.get(), recv_buf->get_remain());
+    }
+
     int recv_data(Buffer* buf, uint32_t count);
-    int send_chain(std::list<Buffer>& chain);
     int send_file(File* file);
+
+    template <typename Iter>
+    Iter send_chain(Iter first, Iter last);
 
 private:
     uint64_t conn_id;
@@ -132,8 +139,51 @@ private:
     static uint64_t count;
 };
 
-inline int Connection::recv_data() {
-    return recv_data(recv_buf.get(), recv_buf->get_remain());
+template <typename Iter>
+Iter Connection::send_chain(Iter first, Iter last) {
+    struct iovec iovs[64];
+    int total, cnt;
+    Iter cur = first;
+
+    while (cur != last) {
+        total = cnt = 0;
+
+        while (cur != last) {
+            iovs[cnt].iov_base = static_cast<void*>((*cur)->get_pos());
+            iovs[cnt].iov_len = (*cur)->get_size();
+            total += (*cur)->get_size();
+            ++cur;
+            if (++cnt == 64) {
+                break;
+            }
+        }
+
+        int n = io_write_chain(socket_fd, iovs, cnt);
+
+        if (n > 0) {
+            if (n < total) {
+                uint32_t num = n;
+                while (first != cur) {
+                    if (num < (*first)->get_size()) {
+                        (*first)->move_pos(num);
+                        break;
+                    }
+                    num -= (*first)->get_size();
+                    ++first;
+                }
+            } else {
+                std::advance(first, cnt);
+                continue;
+            }
+        } else if (n == SERVX_ERROR) {
+            error = 1;
+        }
+
+        write_event.set_ready(false);
+        return cur;
+    }
+
+    return last;
 }
 
 }

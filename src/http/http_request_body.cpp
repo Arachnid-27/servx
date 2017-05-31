@@ -17,8 +17,7 @@ HttpRequestBody::~HttpRequestBody() {
 int HttpRequestBody::read(const http_req_handler_t& h) {
     // TODO: chunked
     if (content_length <= 0) {
-        h(req);
-        return SERVX_OK;
+        return h(req);
     }
 
     handler = h;
@@ -38,8 +37,7 @@ int HttpRequestBody::read(const http_req_handler_t& h) {
 
     if (recv == content_length) {
         req->set_read_handler(http_block_reading);
-        handler(req);
-        return SERVX_OK;
+        return handler(req);
     }
 
     req->set_read_handler(read_request_body_handler);
@@ -80,8 +78,7 @@ int HttpRequestBody::handle_read() {
                 Timer::instance()->del_timer(conn->get_read_event());
             }
             req->set_read_handler(http_block_reading);
-            handler(req);
-            return SERVX_OK;
+            return handler(req);
         } else if (buf->get_remain() == 0) {
             body_buffer.emplace_back(req->get_server()->get_body_buf());
         } else {

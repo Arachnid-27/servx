@@ -7,6 +7,7 @@
 #include "logger.h"
 #include "listener.h"
 #include "module_manager.h"
+#include "signals.h"
 #include "timer.h"
 
 namespace servx {

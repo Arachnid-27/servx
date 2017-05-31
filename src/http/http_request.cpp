@@ -22,7 +22,7 @@ HttpRequest::HttpRequest(Connection* c)
       quoted(false), keep_alive(false) {
 }
 
-std::string HttpRequest::get_headers(const char* s) const {
+std::string HttpRequest::get_header(const char* s) const {
     auto iter = headers.find(std::string(s));
     if (iter == headers.end()) {
         return std::string("");
@@ -97,7 +97,7 @@ void HttpRequest::process_headers(Event* ev) {
     if (rc == SERVX_OK) {
         Logger::instance()->debug("parse request headers success!");
 
-        auto host = get_headers("host");
+        auto host = get_header("host");
         if (host.empty()) {
             Logger::instance()->error("can not find host");
             finalize(HTTP_BAD_REQUEST);
@@ -105,12 +105,13 @@ void HttpRequest::process_headers(Event* ev) {
         } else {
             HttpConnection *hc = conn->get_context<HttpConnection>();
             server = hc->get_listening()->search_server(host);
+            response->set_server(server);
             if (server == hc->get_listening()->get_default_server()) {
                 Logger::instance()->debug("use default server");
             }
         }
 
-        auto length = get_headers("content-length");
+        auto length = get_header("content-length");
         if (!length.empty()) {
             long n = atol(length.c_str());
             if (n == 0 && length != "0") {
@@ -120,7 +121,7 @@ void HttpRequest::process_headers(Event* ev) {
             body->set_content_length(n);
         }
 
-        auto encoding = get_headers("transfer-encoding");
+        auto encoding = get_header("transfer-encoding");
         if (!encoding.empty() && encoding != "identity") {
             Logger::instance()->error("unknown encoding %s",
                                       encoding.c_str());
@@ -128,7 +129,7 @@ void HttpRequest::process_headers(Event* ev) {
             return;
         }
 
-        auto connection = get_headers("connection");
+        auto connection = get_header("connection");
         if (connection == "keep-alive") {
             Logger::instance()->debug("connection keep-alive");
             set_keep_alive(true);
@@ -244,15 +245,21 @@ void HttpRequest::finalize(int rc) {
 }
 
 void HttpRequest::close(int status) {
+    if ((conn->is_error() ||
+        conn->is_timeout()) && response->is_sent()) {
+        conn->close();
+        return;
+    }
+
     if (status != SERVX_OK) {
         response->set_content_length(0);
         response->set_status(status);
+        // TODO: maybe again
         response->send_header();
     }
 
     if (status == HTTP_REQUEST_TIME_OUT ||
         conn->get_read_event()->is_eof() ||
-        conn->is_error() ||
         conn->is_timeout()) {
         conn->close();
         return;

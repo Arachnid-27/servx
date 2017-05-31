@@ -21,8 +21,7 @@ public:
     TcpConnectSocket* get_socket() const { return socket.get(); }
 
     Buffer* get_body_buf();
-
-    void ret_body_buf(Buffer* buf) { free_body_bufs.push_back(buf); }
+    void ret_body_buf(Buffer* buf);
 
 private:
     std::unique_ptr<TcpConnectSocket> socket;

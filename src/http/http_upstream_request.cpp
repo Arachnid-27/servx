@@ -16,7 +16,7 @@ HttpUpstreamRequest::~HttpUpstreamRequest() {
 
 void HttpUpstreamRequest::close(int rc) {
     // TODO: keep-alive
-    finalize_handler(rc);
+    finalize_handler(request, rc);
     conn->close();
 }
 
@@ -40,6 +40,7 @@ int HttpUpstreamRequest::connect() {
         return SERVX_AGAIN;
     }
 
+    build_request();
     rc = send_request();
 
     switch (rc) {
@@ -65,6 +66,7 @@ void HttpUpstreamRequest::wait_connect_handler(Event* ev) {
         return;
     }
 
+    build_request();
     int rc = send_request();
 
     switch (rc) {
@@ -128,7 +130,7 @@ void HttpUpstreamRequest::recv_response_handler(Event* ev) {
         }
 
         // TODO: header and body handler
-        rc = response_handler(buf);
+        rc = response_handler(request, buf);
 
         if (rc == SERVX_OK || rc == SERVX_ERROR) {
             close(rc);
@@ -148,17 +150,96 @@ void HttpUpstreamRequest::recv_response_handler(Event* ev) {
     }
 }
 
-int HttpUpstreamRequest::send_request() {
-    int rc = conn->send_chain(request_bufs);
+void HttpUpstreamRequest::build_request() {
+    // copy it
+    request_body_bufs = request->get_request_body()->get_body_buffer();
+    request_header_bufs.emplace_back(server->get_body_buf());
 
-    if (rc == SERVX_OK) {
-        conn->get_read_event()->set_handler([this](Event* ev) {
-                this->recv_response_handler(ev);
-            });
-        conn->get_write_event()->set_handler(empty_write_handler);
+    int n;
+    Buffer *buf = request_header_bufs.back();
+    char *pos = buf->get_pos();
+
+    n = sprintf(pos, "%s %s%c%s HTTP/1.1\r\n",
+        request->get_method().c_str(), request->get_uri().c_str(),
+        request->get_args().empty() ? ' ' : '?',
+        request->get_args().c_str());
+    pos += n;
+
+    // TODO: keep-alive
+    // TODO: host
+
+    auto hb = request->headers_begin();
+    auto he = request->headers_end();
+
+    while (hb != he) {
+        // TODO: avoid compare
+        if (hb->first != "host" && hb->first != "connection") {
+            n = snprintf(pos, buf->get_remain(), "%s:%s\r\n",
+                         hb->first.c_str(), hb->second.c_str());
+            if (pos + n == buf->get_end()) {
+                request_header_bufs.emplace_back(server->get_body_buf());
+                buf = request_header_bufs.back();
+                pos = buf->get_pos();
+                n = snprintf(pos, buf->get_remain(), "%s:%s\r\n",
+                             hb->first.c_str(), hb->second.c_str());
+            }
+            pos += n;
+            buf->set_last(pos);
+            ++hb;
+        }
     }
 
-    return rc;
+    if (buf->get_remain() < 2) {
+        request_header_bufs.emplace_back(server->get_body_buf());
+        buf = request_header_bufs.back();
+        pos = buf->get_pos();
+    }
+
+    pos[0] = '\r';
+    pos[1] = '\n';
+}
+
+int HttpUpstreamRequest::send_request() {
+    std::list<Buffer*>::iterator first, last, iter;
+
+    if (!request_header_bufs.empty()) {
+        first = request_header_bufs.begin();
+        last = request_header_bufs.end();
+        iter = conn->send_chain(first, last);
+
+        if (conn->is_error()) {
+            return SERVX_ERROR;
+        }
+
+        std::for_each(first, iter,
+            [this](Buffer* buf) { server->ret_body_buf(buf); });
+        request_header_bufs.erase(first, iter);
+
+        if (iter != last) {
+            return SERVX_AGAIN;
+        }
+    }
+
+    first = request_body_bufs.begin();
+    last = request_body_bufs.end();
+    iter = conn->send_chain(first, last);
+
+    if (conn->is_error()) {
+        return SERVX_ERROR;
+    }
+
+    request_header_bufs.erase(first, iter);
+
+    if (iter != last) {
+        return SERVX_AGAIN;
+    }
+
+    conn->get_read_event()->set_handler([this](Event* ev) {
+            this->recv_response_handler(ev);
+        });
+    conn->get_write_event()->set_handler(empty_write_handler);
+
+    return SERVX_OK;
 }
 
 }

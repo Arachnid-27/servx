@@ -37,8 +37,7 @@ public:
     Location* find_location(const std::string& uri);
 
     Buffer* get_body_buf();
-
-    void ret_body_buf(Buffer* buf) { free_body_bufs.push_back(buf); }
+    void ret_body_buf(Buffer* buf);
 
     template <typename T>
     typename T::srv_conf_t* get_conf();
