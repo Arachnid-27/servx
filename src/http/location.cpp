@@ -6,7 +6,7 @@
 namespace servx {
 
 Location::Location(const std::string& s)
-    : regex(false), send_file(false), uri(s) {
+    : regex(false), send_file(false), handler(nullptr), uri(s) {
     auto manager = ModuleManager::instance();
     for (int i = 0; i < NULL_MODULE; ++i) {
         auto module = manager->get_module(i);
@@ -26,9 +26,9 @@ bool LocationTree::push(Location* loc) {
 
     LocationTreeNode* node = root.get();
     auto length = uri.length();
-    decltype(node->child.find(0)) it;
+    decltype(node->child.find(' ')) it;
 
-    for (size_t i = 1; i < length; ++i) {
+    for (size_t i = 0; i < length; ++i) {
         it = node->child.find(uri[i]);
         if (it == node->child.end()) {
             node->child[uri[i]] =
@@ -53,9 +53,9 @@ Location* LocationTree::find(const std::string& uri) {
     Location* result = nullptr;
     LocationTreeNode* node = root.get();
     auto length = uri.length();
-    decltype(node->child.find(0)) it;
+    decltype(node->child.find(' ')) it;
 
-    for (size_t i = 1; i < length; ++i) {
+    for (size_t i = 0; i < length; ++i) {
         it = node->child.find(uri[i]);
         if (it == node->child.end()) {
             break;

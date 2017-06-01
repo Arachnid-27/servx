@@ -1,6 +1,7 @@
 #include "http_phase.h"
 
 #include "core.h"
+#include "http_request.h"
 #include "logger.h"
 
 namespace servx {
@@ -71,14 +72,13 @@ int HttpPhaseRunner::generic_phase_checker(HttpRequest* req) {
 }
 
 int HttpPhaseRunner::content_phase_checker(HttpRequest* req) {
-    if (req->get_content_handler() != nullptr) {
-        // TODO: content handler
-        return SERVX_OK;
+    auto &vec = phase_handlers[req->get_phase()];
+    auto handler = req->get_location()->get_content_handler();
+    if (handler == nullptr) {
+        handler = vec[req->get_phase_index()];
     }
 
-    auto &vec = phase_handlers[req->get_phase()];
-    auto &handler = vec[req->get_phase_index()];
-    int rc = handler(req);
+    int rc =  handler(req);
 
     Logger::instance()->debug("content phase checker get %d", rc);
 

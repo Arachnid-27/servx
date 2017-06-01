@@ -4,9 +4,11 @@
 #include <functional>
 #include <vector>
 
-#include "http_request.h"
+#include "http.h"
 
 namespace servx {
+
+class HttpRequest;
 
 class HttpPhaseRunner {
 public:

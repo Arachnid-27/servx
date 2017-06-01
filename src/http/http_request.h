@@ -16,8 +16,6 @@ struct HttpRequestContext {
     virtual ~HttpRequestContext() {}
 };
 
-class HttpRequestBody;
-
 class HttpRequest {
 public:
     using http_phase_handler_t = std::function<int(HttpRequest*)>;
@@ -87,9 +85,6 @@ public:
     uint32_t get_phase_index() const { return phase_index; }
     void next_phase_index() { ++phase_index; }
 
-    http_phase_handler_t get_content_handler() { return content_handler; }
-    void get_content_handler(const http_phase_handler_t& h);
-
     HttpResponse* get_response() { return response.get(); }
     HttpRequestBody* get_request_body() { return body.get(); }
 
@@ -139,10 +134,6 @@ private:
     std::string args;
     std::string version;
 };
-
-inline void HttpRequest::get_content_handler(const http_phase_handler_t& h) {
-    content_handler = h;
-}
 
 inline void HttpRequest::set_headers_value(std::string&& s) {
     headers.emplace(std::move(name), std::move(s));

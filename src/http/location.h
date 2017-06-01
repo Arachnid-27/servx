@@ -10,13 +10,12 @@
 
 namespace servx {
 
-//class HttpRequest;
+class HttpRequest;
 
-//using http_req_handler_t = std::function<void(HttpRequest*)>;
+using http_content_handler_t = std::function<int(HttpRequest*)>;
 
 struct HttpCoreLocConf: public ModuleConf {
     int client_max_body_size;
-//    http_req_handler_t handler; // TODO: init
 };
 
 class Location {
@@ -37,6 +36,9 @@ public:
 
     HttpCoreLocConf* get_core_conf();
 
+    void set_content_handler(const http_content_handler_t& h) { handler = h; }
+    http_content_handler_t get_content_handler() { return handler; }
+
     const std::string& get_root() const { return root; }
     void set_root(const std::string& s) { root = s; }
     void set_root(std::string&& s) { root = std::move(s); }
@@ -47,6 +49,8 @@ public:
 private:
     uint32_t regex:1;
     uint32_t send_file:1;
+
+    http_content_handler_t handler;
 
     std::string root;
     std::string uri;

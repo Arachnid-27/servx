@@ -25,6 +25,8 @@ public:
 
     const std::string& get_name() const { return name; }
 
+    bool empty() const { return servers.empty(); }
+
 private:
     uint32_t index;
     std::string name;

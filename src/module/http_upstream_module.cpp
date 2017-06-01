@@ -1,4 +1,5 @@
 #include "http_upstream_module.h"
+#include "logger.h"
 
 namespace servx {
 
@@ -13,11 +14,18 @@ int HttpUpstreamModule::upstream_handler(command_vals_t v) {
 }
 
 int HttpUpstreamModule::server_handler(command_vals_t v) {
-    upstream->push_server(v[0], v[1]);
+    if (!upstream->push_server(v[0], v[1])) {
+        return SERVX_ERROR;
+    }
     return NULL_BLOCK;
 }
 
 bool HttpUpstreamModule::upstream_post_handler() {
+    if (upstream->empty()) {
+        Logger::instance()->error("upstream %s is empty",
+            upstream->get_name().c_str());
+        return false;
+    }
     conf->upstreams.emplace(upstream->get_name(), std::move(upstream));
     upstream = nullptr;
     return true;

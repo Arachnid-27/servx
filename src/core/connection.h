@@ -16,6 +16,7 @@ namespace servx {
 class Connection;
 
 class Event {
+    using event_handler_t = std::function<void(Event*)>;
 public:
     Event(Connection* c, bool w);
 
@@ -46,7 +47,7 @@ public:
     bool is_timeout() const { return timeout; }
 
     void handle() { handler(this); }
-    void set_handler(const std::function<void(Event*)>& h) { handler = h; }
+    void set_handler(const event_handler_t& h) { handler = h; }
 
     void expire();
 
@@ -60,7 +61,7 @@ private:
     uint32_t timeout:1;
     uint32_t eof:1;
     uint64_t timer;
-    std::function<void(Event*)> handler;
+    event_handler_t handler;
 };
 
 void empty_read_handler(Event*);
@@ -118,6 +119,7 @@ public:
     }
 
     int recv_data(Buffer* buf, uint32_t count);
+    int send_data(Buffer* buf, uint32_t count);
     int send_file(File* file);
 
     template <typename Iter>

@@ -175,7 +175,7 @@ int TcpConnectSocket::connect() {
 
         int err = errno;
 
-        if (err == EAGAIN) {
+        if (err == EINPROGRESS) {
             return SERVX_AGAIN;
         }
 

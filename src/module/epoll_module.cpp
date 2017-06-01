@@ -104,6 +104,7 @@ bool EpollModule::del_event(Event* ev, int flags) {
     }
 
     if (epoll_ctl(ep, op, c->get_fd(), &ee) == -1) {
+        Logger::instance()->warn("epoll ctl error, %d", errno);
         return false;
     }
 
@@ -116,15 +117,19 @@ bool EpollModule::add_connection(Connection* c) {
     epoll_event ee;
 
     ee.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP;
-    ee.data.ptr = &c;
+    ee.data.ptr = c;
 
     if (!c->is_listen()) {
         ee.events |= EPOLLET;
     }
 
     if (epoll_ctl(ep, EPOLL_CTL_ADD, c->get_fd(), &ee) == -1) {
+        Logger::instance()->warn("epoll ctl error, %d", errno);
         return false;
     }
+
+    c->get_read_event()->set_active(true);
+    c->get_write_event()->set_active(true);
 
     return true;
 }
@@ -191,7 +196,7 @@ bool EpollModule::process_events() {
         event = c->get_read_event();
 
         if ((flags & EPOLLIN) && event->is_active()) {
-            Logger::instance()->debug("handle read event...");
+            Logger::instance()->debug("handle read event %p...", event);
 
             if (flags & EPOLLRDHUP) {
                 // Todo
@@ -204,6 +209,7 @@ bool EpollModule::process_events() {
         event = c->get_write_event();
 
         if ((flags & EPOLLOUT) && event->is_active()) {
+            Logger::instance()->debug("handle write event %p...", event);
             if (c->is_close()) {    // Todo handle stale event
                 continue;
             }

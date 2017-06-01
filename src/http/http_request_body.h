@@ -1,10 +1,10 @@
 #ifndef _HTTP_REQUEST_BODY_
 #define _HTTP_REQUEST_BODY_
 
+#include <functional>
 #include <list>
 
 #include "buffer.h"
-#include "http_request.h"
 
 namespace servx {
 

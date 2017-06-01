@@ -158,7 +158,6 @@ int HttpResponse::send_header() {
 
     pos[0] = '\r';
     pos[1] = '\n';
-
     buf->set_last(pos + 2);
 
     return send();

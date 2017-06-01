@@ -1,6 +1,7 @@
 #include "http_request_body.h"
 
 #include "core.h"
+#include "http_request.h"
 #include "io.h"
 #include "logger.h"
 #include "timer.h"

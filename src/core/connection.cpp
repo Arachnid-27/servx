@@ -119,6 +119,30 @@ int Connection::recv_data(Buffer* buf, uint32_t count) {
     return n;
 }
 
+int Connection::send_data(Buffer* buf, uint32_t count) {
+    if (count > buf->get_size()) {
+        Logger::instance()->warn("[send data] count > size");
+        count = buf->get_size();
+    }
+
+    int n = io_write(socket_fd, buf->get_pos(), count);
+
+    if (n > 0) {
+        buf->move_pos(n);
+        if (static_cast<uint32_t>(n) < count) {
+            read_event.set_ready(false);
+        }
+        return n;
+    }
+
+    if (n == SERVX_ERROR) {
+        error = 1;
+    }
+
+    read_event.set_ready(false);
+    return n;
+}
+
 int Connection::send_file(File* file) {
     if (!file->file_status()) {
         return SERVX_ERROR;

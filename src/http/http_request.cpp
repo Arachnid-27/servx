@@ -260,6 +260,7 @@ void HttpRequest::close(int status) {
 
     if (status == HTTP_REQUEST_TIME_OUT ||
         conn->get_read_event()->is_eof() ||
+        conn->is_error() ||
         conn->is_timeout()) {
         conn->close();
         return;
