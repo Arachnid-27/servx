@@ -18,7 +18,7 @@ public:
 
     ~HttpUpstreamServer() = default;
 
-    TcpConnectSocket* get_socket() const { return socket.get(); }
+    const TcpConnectSocket& get_socket() const { return *socket; }
 
     Buffer* get_body_buf();
     void ret_body_buf(Buffer* buf);

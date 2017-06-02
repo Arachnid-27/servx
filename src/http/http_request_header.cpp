@@ -1,113 +1,14 @@
-#include "http_parse.h"
+#include "http_request_header.h"
 
-#include "core.h"
-
-#define LOWER_CASE(ch) (ch | 0x20)
+#include "http_request.h"
 
 namespace servx {
 
-inline int compare_method_4(const char* p1, const char* p2) {
-    return *reinterpret_cast<const uint32_t*>(p1) ==
-           *reinterpret_cast<const uint32_t*>(p2);
-}
-
-inline int compare_method_6(const char* p1, const char* p2) {
-    return *reinterpret_cast<const uint32_t*>(p1) ==
-           *reinterpret_cast<const uint32_t*>(p2) &&
-           *reinterpret_cast<const uint16_t*>(p1 + 4) ==
-           *reinterpret_cast<const uint16_t*>(p2 + 4);
-}
-
-inline int compare_method_8(const char* p1, const char* p2) {
-    return *reinterpret_cast<const uint32_t*>(p1) ==
-           *reinterpret_cast<const uint32_t*>(p2) &&
-           *reinterpret_cast<const uint32_t*>(p1 + 4) ==
-           *reinterpret_cast<const uint32_t*>(p2 + 4);
-}
-
-enum HttpParseState {
-    PARSE_START,
-
-    PARSE_METHOD,
-    PARSE_BEFORE_URI,
-    PARSE_ABSOLUTE_URI_SCHEMA,
-    PARSE_ABSOLUTE_URI_SCHEMA_SLASH,
-    PARSE_ABSOLUTE_URI_SCHEMA_SLASH_2,
-    PARSE_ABSOLUTE_URI_HOST,
-    PARSE_ABSOLUTE_URI_HOST_IPV6,
-    PARSE_ABSOLUTE_URI_HOST_IPV4_OR_REG_NAME,
-    PARSE_ABSOLUTE_URI_HOST_END,
-    PARSE_ABSOLUTE_URI_PORT,
-    PARSE_ABS_PATH,
-    PARSE_ABS_PATH_ARGS,
-    PARSE_ABS_PATH_FRAGMENT,
-    PARSE_VERSION_H,
-    PARSE_VERSION_HT,
-    PARSE_VERSION_HTT,
-    PARSE_VERSION_HTTP,
-    PARSE_VERSION_HTTP_SLASH,
-    PARSE_VERSION_HTTP_SLASH_NUMBER,
-    PARSE_VERSION_HTTP_SLASH_VERSION,
-
-    PARSE_HEADERS_NAME,
-    PARSE_HEADERS_COLON,
-    PARSE_HEADERS_VALUE,
-
-    PARSE_LAST_CR,
-    PARSE_LAST_CR_LF,
-    PARSE_LAST_CR_LF_CR,
-    PARSE_LAST_CR_LF_CR_LF,
-
-    PARSE_DONE
-};
-
-void http_parse_method(HttpRequest* req, const char* p1, const char *p2) {
-    switch (p2 - p1) {
-    case 3:
-    case 4:
-        if (compare_method_4(p1, "GET ")) {
-            req->set_method(HTTP_METHOD_GET);
-            break;
-        }
-
-        if (compare_method_4(p1, "HEAD")) {
-            req->set_method(HTTP_METHOD_HEAD);
-            break;
-        }
-
-        if (compare_method_4(p1, "POST")) {
-            req->set_method(HTTP_METHOD_POST);
-            break;
-        }
-
-        if (compare_method_4(p1, "PUT ")) {
-            req->set_method(HTTP_METHOD_PUT);
-            break;
-        }
-
-        break;
-    case 6:
-        if (compare_method_6(p1, "DELETE")) {
-            req->set_method(HTTP_METHOD_DELETE);
-        }
-
-        break;
-    case 7:
-        if (compare_method_8(p1, "OPTIONS ")) {
-            req->set_method(HTTP_METHOD_OPTIONS);
-        }
-
-        break;
-    }
-}
-
-int http_parse_request_line(HttpRequest* req) {
+int HttpRequestHeader::parse_request_line() {
     static const char* slash = "/";
 
-    int state = req->get_parse_state();
-    Buffer *buf = req->get_recv_buf();
-    char *start = buf->get_pos();
-    char *last = buf->get_last();
+    char *start = buffer->get_pos();
+    char *last = buffer->get_last();
     char c, ch;
 
     for (char *p = start; p < last; ++p) {
@@ -132,8 +33,8 @@ int http_parse_request_line(HttpRequest* req) {
             }
 
             if (ch == ' ') {
-                http_parse_method(req, start, p);
-                req->set_method(std::string(start, p));
+                // http_parse_method(req, start, p);
+                method = std::string(start, p);
                 start = p + 1;
                 state = PARSE_BEFORE_URI;
                 break;
@@ -168,7 +69,7 @@ int http_parse_request_line(HttpRequest* req) {
             }
 
             if (ch == ':') {
-                req->set_schema(std::string(start, p));
+                schema = std::string(start, p);
                 start = p + 1;
                 state = PARSE_ABSOLUTE_URI_SCHEMA_SLASH;
                 break;
@@ -219,18 +120,18 @@ int http_parse_request_line(HttpRequest* req) {
         case PARSE_ABSOLUTE_URI_HOST_END:
             switch (ch) {
             case ':':
-                req->set_host(std::string(start, p));
+                host = std::string(start, p);
                 start = p + 1;
                 state = PARSE_ABSOLUTE_URI_PORT;
                 break;
             case '/':
-                req->set_host(std::string(start, p));
+                host = std::string(start, p);
                 start = p;
                 state = PARSE_ABS_PATH;
                 break;
             case ' ':
-                req->set_host(std::string(start, p));
-                req->set_uri(std::string(slash, slash + 1));
+                host = std::string(start, p);
+                uri = std::string(slash, slash + 1);
                 start = p + 1;
                 state = PARSE_VERSION_H;
                 break;
@@ -264,13 +165,13 @@ int http_parse_request_line(HttpRequest* req) {
 
             switch (ch) {
             case '/':
-                req->set_port(std::string(start, p));
+                port = std::string(start, p);
                 start = p;
                 state = PARSE_ABS_PATH;
                 break;
             case ' ':
-                req->set_port(std::string(start, p));
-                req->set_uri(std::string(slash, slash + 1));
+                port = std::string(start, p);
+                uri = std::string(slash, slash + 1);
                 start = p + 1;
                 state = PARSE_VERSION_H;
                 break;
@@ -283,22 +184,22 @@ int http_parse_request_line(HttpRequest* req) {
         case PARSE_ABS_PATH:
             switch (ch) {
             case ' ':
-                req->set_uri(std::string(start, p));
+                uri = std::string(start, p);
                 start = p + 1;
                 state = PARSE_VERSION_H;
                 break;
             case '#':
-                req->set_uri(std::string(start, p));
+                uri = std::string(start, p);
                 start = p + 1;
                 state = PARSE_ABS_PATH_FRAGMENT;
                 break;
             case '?':
-                req->set_uri(std::string(start, p));
+                uri = std::string(start, p);
                 start = p + 1;
                 state = PARSE_ABS_PATH_ARGS;
                 break;
             case '%':
-                req->set_quoted(true);
+                quoted = true;
                 break;
             case CR:
             case LF:
@@ -310,12 +211,12 @@ int http_parse_request_line(HttpRequest* req) {
         case PARSE_ABS_PATH_ARGS:
             switch (ch) {
             case ' ':
-                req->set_args(std::string(start, p));
+                args = std::string(start, p);
                 start = p + 1;
                 state = PARSE_VERSION_H;
                 break;
             case '#':
-                req->set_args(std::string(start, p));
+                args = std::string(start, p);
                 start = p + 1;
                 state = PARSE_ABS_PATH_FRAGMENT;
                 break;
@@ -406,19 +307,19 @@ int http_parse_request_line(HttpRequest* req) {
 
             switch (ch) {
             case ' ':
-                req->set_version(std::string(start, p));
+                version = std::string(start, p);
                 start = p + 1;
                 state = PARSE_LAST_CR;
                 break;
             case CR:
-                req->set_version(std::string(start, p));
+                version = std::string(start, p);
                 start = p + 1;
                 state = PARSE_LAST_CR_LF;
                 break;
             case LF:
-                req->set_version(std::string(start, p));
-                buf->set_pos(p + 1);
-                req->set_parse_state(PARSE_START);
+                version = std::string(start, p);
+                buffer->set_pos(p + 1);
+                state = PARSE_START;
                 return SERVX_OK;
             default:
                 return SERVX_ERROR;
@@ -436,8 +337,8 @@ int http_parse_request_line(HttpRequest* req) {
                 start = p + 1;
                 break;
             case LF:
-                buf->set_pos(p + 1);
-                req->set_parse_state(PARSE_START);
+                buffer->set_pos(p + 1);
+                state = PARSE_START;
                 return SERVX_OK;
             default:
                 return SERVX_ERROR;
@@ -447,8 +348,8 @@ int http_parse_request_line(HttpRequest* req) {
 
         case PARSE_LAST_CR_LF:
             if (ch == LF) {
-                buf->set_pos(p + 1);
-                req->set_parse_state(PARSE_START);
+                buffer->set_pos(p + 1);
+                state = PARSE_START;
                 return SERVX_OK;
             }
 
@@ -456,12 +357,11 @@ int http_parse_request_line(HttpRequest* req) {
         }
     }
 
-    buf->set_pos(start);
-    req->set_parse_state(state);
+    buffer->set_pos(start);
     return SERVX_AGAIN;
 }
 
-int http_parse_request_headers(HttpRequest* req) {
+int HttpRequestHeader::parse_request_headers() {
     // allow underscores
     static uint8_t lowercase[] = {
          0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
@@ -498,10 +398,8 @@ int http_parse_request_headers(HttpRequest* req) {
          0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
     };
 
-    int state = req->get_parse_state();
-    Buffer *buf = req->get_recv_buf();
-    char *start = buf->get_pos();
-    char *last = buf->get_last();
+    char *start = buffer->get_pos();
+    char *last = buffer->get_last();
     char ch;
 
     for (char *p = start; p < last; ++p) {
@@ -514,8 +412,9 @@ int http_parse_request_headers(HttpRequest* req) {
                 state = PARSE_LAST_CR_LF_CR_LF;
                 break;
             case LF:
-                req->set_parse_state(PARSE_DONE);
-                buf->set_pos(p + 1);
+                temp = "";
+                state = PARSE_DONE;
+                buffer->set_pos(p + 1);
                 return SERVX_OK;
             default:
                 ch = lowercase[static_cast<uint8_t>(ch)];
@@ -532,7 +431,7 @@ int http_parse_request_headers(HttpRequest* req) {
         case PARSE_HEADERS_NAME:
             switch (ch) {
             case ':':
-                req->set_headers_name(std::string(start, p));
+                temp = std::string(start, p);
                 start = p + 1;
                 state = PARSE_HEADERS_COLON;
                 break;
@@ -564,12 +463,12 @@ int http_parse_request_headers(HttpRequest* req) {
         case PARSE_HEADERS_VALUE:
             switch (ch) {
             case CR:
-                req->set_headers_value(std::string(start, p));
+                headers.emplace(std::move(temp), std::string(start, p));
                 start = p + 1;
                 state = PARSE_LAST_CR_LF;
                 break;
             case LF:
-                req->set_headers_value(std::string(start, p));
+                headers.emplace(std::move(temp), std::string(start, p));
                 start = p + 1;
                 state = PARSE_LAST_CR_LF_CR;
                 break;
@@ -618,8 +517,9 @@ int http_parse_request_headers(HttpRequest* req) {
 
         case PARSE_LAST_CR_LF_CR_LF:
             if (ch == LF) {
-                req->set_parse_state(PARSE_DONE);
-                buf->set_pos(p + 1);
+                temp = "";
+                state = PARSE_DONE;
+                buffer->set_pos(p + 1);
                 return SERVX_OK;
             }
 
@@ -627,17 +527,47 @@ int http_parse_request_headers(HttpRequest* req) {
         }
     }
 
-    buf->set_pos(start);
-    req->set_parse_state(state);
+    buffer->set_pos(start);
     return SERVX_AGAIN;
 }
 
-int http_parse_quoted(HttpRequest* req) {
-    return SERVX_OK;
-}
+HttpMethod HttpRequestHeader::parse_request_method() {
+    const char *p = method.data();
+    switch (method.length()) {
+    case 3:
+    case 4:
+        if (CMP_METHOD_4(p, "GET")) {   // null-terminated
+            return HTTP_METHOD_GET;
+        }
 
-int http_parse_args(HttpRequest* req) {
-    return SERVX_OK;
+        if (CMP_METHOD_4(p, "HEAD")) {
+            return HTTP_METHOD_HEAD;
+        }
+
+        if (CMP_METHOD_4(p, "POST")) {
+            return HTTP_METHOD_POST;
+        }
+
+        if (CMP_METHOD_4(p, "PUT")) {   // null-terminated
+            return HTTP_METHOD_PUT;
+        }
+
+        break;
+    case 6:
+        if (CMP_METHOD_6(p, "DELETE")) {
+            return HTTP_METHOD_DELETE;
+        }
+
+        break;
+    case 7:
+        if (CMP_METHOD_8(p, "OPTIONS")) {   // null-terminated
+            return HTTP_METHOD_OPTIONS;
+        }
+
+        break;
+    }
+
+    return HTTP_METHOD_UNKONWN;
 }
 
 }

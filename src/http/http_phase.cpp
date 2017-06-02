@@ -97,7 +97,7 @@ int HttpPhaseRunner::content_phase_checker(HttpRequest* req) {
         return SERVX_AGAIN;
     }
 
-    if (req->get_uri().back() == '/') {
+    if (req->get_request_header()->get_uri().back() == '/') {
         req->finalize(HTTP_FORBIDDEN);
         return SERVX_OK;
     }
@@ -107,9 +107,11 @@ int HttpPhaseRunner::content_phase_checker(HttpRequest* req) {
 }
 
 int HttpPhaseRunner::find_config_handler(HttpRequest* req) {
-    Location *loc = req->get_server()->find_location(req->get_uri());
+    Location *loc = req->get_server()->
+        find_location(req->get_request_header()->get_uri());
     if (loc == nullptr) {
-        Logger::instance()->info("can not find %s", req->get_uri().c_str());
+        Logger::instance()->info("can not find %s",
+            req->get_request_header()->get_uri().c_str());
         return HTTP_NOT_FOUND;
     }
 

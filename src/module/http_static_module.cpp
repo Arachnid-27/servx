@@ -19,7 +19,7 @@ int HttpStaticModule::http_static_handler(HttpRequest* req) {
         return HTTP_NOT_ALLOWED;
     }
 
-    auto &uri = req->get_uri();
+    auto &uri = req->get_request_header()->get_uri();
 
     // directory
     if (uri.back() == '/') {

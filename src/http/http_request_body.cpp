@@ -24,15 +24,16 @@ int HttpRequestBody::read(const http_req_handler_t& h) {
     handler = h;
     body_buffer.emplace_back(req->get_server()->get_body_buf());
 
-    int pre = req->get_recv_buf()->get_size();
+    Buffer *pre_buf = req->get_connection()->get_recv_buf();
+    int pre = pre_buf->get_size();
     if (pre != 0) {
         Buffer *buf = body_buffer.back();
         if (pre > content_length) {
             pre = content_length;
         }
         // TODO: don't copy it
-        memmove(buf->get_pos(), req->get_recv_buf()->get_pos(), pre);
-        req->get_recv_buf()->move_pos(pre);
+        memmove(buf->get_pos(), pre_buf->get_pos(), pre);
+        pre_buf->move_pos(pre);
         recv += pre;
     }
 
@@ -98,12 +99,13 @@ int HttpRequestBody::discard() {
         Timer::instance()->del_timer(ev);
     }
 
-    int pre = req->get_recv_buf()->get_size();
+    Buffer *pre_buf = req->get_connection()->get_recv_buf();
+    int pre = pre_buf->get_size();
     if (pre != 0) {
         if (pre > content_length) {
             pre = content_length;
         }
-        req->get_recv_buf()->move_pos(pre);
+        pre_buf->move_pos(pre);
         recv += pre;
     }
 

@@ -6,7 +6,6 @@
 #include "core.h"
 #include "event_module.h"
 #include "http_connection.h"
-#include "http_parse.h"
 #include "http_phase.h"
 #include "logger.h"
 #include "timer.h"
@@ -14,20 +13,11 @@
 namespace servx {
 
 HttpRequest::HttpRequest(Connection* c)
-    : conn(c), http_method(HTTP_METHOD_UNKONWN), parse_state(0),
-      body(new HttpRequestBody(this)),
-      response(new HttpResponse(c)),
+    : conn(c), http_method(HTTP_METHOD_UNKONWN),
+      header(c->get_recv_buf()), body(this), response(c),
       phase(HTTP_POST_READ_PHASE), phase_index(0),
-      content_handler(nullptr), server(nullptr),
-      quoted(false), keep_alive(false) {
-}
-
-std::string HttpRequest::get_header(const char* s) const {
-    auto iter = headers.find(std::string(s));
-    if (iter == headers.end()) {
-        return std::string("");
-    }
-    return iter->second;
+      server(nullptr), location(nullptr),
+      keep_alive(false) {
 }
 
 void HttpRequest::handle(Event* ev) {
@@ -45,7 +35,7 @@ void HttpRequest::handle(Event* ev) {
 int HttpRequest::read_headers() {
     Event *ev = conn->get_read_event();
 
-    if (get_recv_buf()->get_remain() == 0) {
+    if (conn->get_recv_buf()->get_remain() == 0) {
         // TODO: enlarge double size
         Logger::instance()->error("request too large");
         finalize(HTTP_BAD_REQUEST);
@@ -92,12 +82,12 @@ void HttpRequest::process_headers(Event* ev) {
         }
     }
 
-    rc = http_parse_request_headers(this);
+    rc = header.parse_request_headers();
 
     if (rc == SERVX_OK) {
         Logger::instance()->debug("parse request headers success!");
 
-        auto host = get_header("host");
+        auto host = header.get_header("host");
         if (host.empty()) {
             Logger::instance()->error("can not find host");
             finalize(HTTP_BAD_REQUEST);
@@ -105,23 +95,23 @@ void HttpRequest::process_headers(Event* ev) {
         } else {
             HttpConnection *hc = conn->get_context<HttpConnection>();
             server = hc->get_listening()->search_server(host);
-            response->set_server(server);
+            response.set_server(server);
             if (server == hc->get_listening()->get_default_server()) {
                 Logger::instance()->debug("use default server");
             }
         }
 
-        auto length = get_header("content-length");
+        auto length = header.get_header("content-length");
         if (!length.empty()) {
             long n = atol(length.c_str());
             if (n == 0 && length != "0") {
                 finalize(HTTP_BAD_REQUEST);
                 return;
             }
-            body->set_content_length(n);
+            body.set_content_length(n);
         }
 
-        auto encoding = get_header("transfer-encoding");
+        auto encoding = header.get_header("transfer-encoding");
         if (!encoding.empty() && encoding != "identity") {
             Logger::instance()->error("unknown encoding %s",
                                       encoding.c_str());
@@ -129,7 +119,7 @@ void HttpRequest::process_headers(Event* ev) {
             return;
         }
 
-        auto connection = get_header("connection");
+        auto connection = header.get_header("connection");
         if (connection == "keep-alive") {
             Logger::instance()->debug("connection keep-alive");
             set_keep_alive(true);
@@ -178,7 +168,7 @@ void HttpRequest::process_line(Event* ev) {
         }
     }
 
-    rc = http_parse_request_line(this);
+    rc = header.parse_request_line();
 
     if (rc == SERVX_OK) {
         Logger::instance()->debug("parsing request success!\n"   \
@@ -188,33 +178,35 @@ void HttpRequest::process_line(Event* ev) {
                                   "uri: %s\n"                    \
                                   "args: %s\n"                   \
                                   "version: %s\n",
-                                  method.c_str(),
-                                  schema.c_str(),
-                                  host.c_str(),
-                                  uri.c_str(),
-                                  args.c_str(),
-                                  version.c_str());
+                                  header.method.c_str(),
+                                  header.schema.c_str(),
+                                  header.host.c_str(),
+                                  header.uri.c_str(),
+                                  header.args.c_str(),
+                                  header.version.c_str());
 
-        if (version != "1.1") {
+        if (header.version != "1.1") {
             finalize(HTTP_BAD_REQUEST);
             return;
         }
 
-        if (quoted) {
-            if (http_parse_quoted(this) == SERVX_ERROR) {
+        http_method = header.parse_request_method();
+
+        if (header.quoted) {
+        /*    if (http_parse_quoted(this) == SERVX_ERROR) {
                 finalize(HTTP_BAD_REQUEST);
                 return;
-            }
+            }*/
         }
 
-        if (!args.empty()) {
-            if (http_parse_args(this) == SERVX_ERROR) {
+        if (!header.args.empty()) {
+        /*    if (http_parse_args(this) == SERVX_ERROR) {
                 finalize(HTTP_BAD_REQUEST);
                 return;
-            }
+            }*/
         }
 
-        if (!host.empty()) {
+        if (!header.host.empty()) {
             // TODO: check host format
         }
 
@@ -246,16 +238,16 @@ void HttpRequest::finalize(int rc) {
 
 void HttpRequest::close(int status) {
     if ((conn->is_error() ||
-        conn->is_timeout()) && response->is_sent()) {
+        conn->is_timeout()) && response.is_sent()) {
         conn->close();
         return;
     }
 
     if (status != SERVX_OK) {
-        response->set_content_length(0);
-        response->set_status(status);
+        response.set_content_length(0);
+        response.set_status(status);
         // TODO: maybe again
-        response->send_header();
+        response.send_header();
     }
 
     if (status == HTTP_REQUEST_TIME_OUT ||

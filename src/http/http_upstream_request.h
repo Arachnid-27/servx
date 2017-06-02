@@ -48,6 +48,8 @@ private:
     HttpRequest *request;
     Connection* conn;
 
+    std::unique_ptr<TcpConnectSocket> socket;
+
     std::unordered_map<std::string, std::string> extra_headers;
     std::list<Buffer*> request_header_bufs;
     std::list<Buffer*> request_body_bufs;

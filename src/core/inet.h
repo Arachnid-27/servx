@@ -16,9 +16,21 @@ class IPSockAddr {
 public:
     IPSockAddr() = default;
 
-    IPSockAddr(const IPSockAddr&) = delete;
+    IPSockAddr(const IPSockAddr& other) {
+        length = other.length;
+        memmove(addr, other.addr, length);
+    }
+
     IPSockAddr(IPSockAddr&&) = delete;
-    IPSockAddr& operator=(const IPSockAddr&) = delete;
+
+    IPSockAddr& operator=(const IPSockAddr& other) {
+        if (&other != this) {
+            length = other.length;
+            memmove(addr, other.addr, length);
+        }
+        return *this;
+    }
+
     IPSockAddr& operator==(IPSockAddr&&) = delete;
 
     ~IPSockAddr() = default;
@@ -44,9 +56,21 @@ class TcpSocket {
 public:
     TcpSocket(): fd(-1), send_buf(-1), recv_buf(-1) {}
 
-    TcpSocket(const TcpSocket&) = delete;
+    TcpSocket(const TcpSocket& other): addr(other.addr), fd(-1),
+        send_buf(other.send_buf), recv_buf(other.recv_buf) {}
+
     TcpSocket(TcpSocket&&) = delete;
-    TcpSocket& operator=(const TcpSocket&) = delete;
+
+    TcpSocket& operator=(const TcpSocket& other) {
+        if (&other != this) {
+            fd = -1;
+            addr = other.addr;
+            send_buf = other.send_buf;
+            recv_buf = other.recv_buf;
+        }
+        return *this;
+    }
+
     TcpSocket& operator=(TcpSocket&&) = delete;
 
     virtual ~TcpSocket();

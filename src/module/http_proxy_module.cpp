@@ -56,6 +56,7 @@ int HttpProxyModule::proxy_pass_request_handler(HttpRequest* req) {
 int HttpProxyModule::proxy_pass_response_handler(
     HttpRequest* req, Buffer* buf) {
     int n = req->get_connection()->send_data(buf, buf->get_size());
+
     // TODO: parse
     Logger::instance()->debug("send %d bytes", n);
     return SERVX_AGAIN;

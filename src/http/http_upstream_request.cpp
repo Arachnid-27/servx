@@ -19,12 +19,11 @@ void HttpUpstreamRequest::close(int rc) {
     // TODO: keep-alive
     finalize_handler(request, rc);
     conn->close();
-    // FIXME: close double here
-    server->get_socket()->close();
 }
 
 int HttpUpstreamRequest::connect() {
-    auto socket = server->get_socket();
+    socket = std::unique_ptr<TcpConnectSocket>(
+        new TcpConnectSocket(server->get_socket()));
     int rc = socket->connect();
 
     if (rc == SERVX_ERROR) {
@@ -185,17 +184,19 @@ void HttpUpstreamRequest::build_request() {
     char *pos = buf->get_pos();
 
     n = sprintf(pos, "%s %s%s%s HTTP/1.1\r\n",
-        request->get_method().c_str(), request->get_uri().c_str(),
-        request->get_args().empty() ? "" : "?",
-        request->get_args().c_str());
+        request->get_request_header()->get_method().c_str(),
+        request->get_request_header()->get_uri().c_str(),
+        request->get_request_header()->get_args().empty() ? "" : "?",
+        request->get_request_header()->get_args().c_str());
     pos += n;
     buf->set_last(pos);
 
     // TODO: keep-alive
     // TODO: host
 
-    auto hb = request->headers_begin();
-    auto he = request->headers_end();
+    auto &headers = request->get_request_header()->get_headers();
+    auto hb = headers.begin();
+    auto he = headers.end();
 
     while (hb != he) {
         // TODO: avoid compare
