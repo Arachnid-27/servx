@@ -23,6 +23,7 @@ public:
     char* get_last() const { return last; }
     void set_last(char* p) { last = p; }
 
+    char *get_start() const { return start; }
     char *get_end() const { return end; }
 
     void move_pos(int n) { pos += n; }

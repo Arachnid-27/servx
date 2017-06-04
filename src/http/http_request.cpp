@@ -82,7 +82,7 @@ void HttpRequest::process_headers(Event* ev) {
         }
     }
 
-    rc = header.parse_request_headers();
+    rc = header.parse_headers();
 
     if (rc == SERVX_OK) {
         Logger::instance()->debug("parse request headers success!");

@@ -48,7 +48,7 @@ private:
     std::unordered_set<std::string> server_names;
     std::vector<std::unique_ptr<Location>> regex_locations;
     LocationTree prefix_locations;
-    std::vector<Buffer> all_bufs;
+    std::vector<std::unique_ptr<Buffer>> all_bufs;
     std::vector<Buffer*> free_body_bufs;
     std::unique_ptr<ModuleConf> confs[NULL_MODULE];
 };

@@ -35,7 +35,11 @@ public:
 
     static int proxy_pass_request_handler(HttpRequest* req);
 
-    static int proxy_pass_response_handler(HttpRequest* req, Buffer* buf);
+    static int proxy_pass_response_header_handler(
+        HttpRequest* req, Buffer* buf);
+
+    static int proxy_pass_response_body_handler(
+        HttpRequest* req, Buffer* buf);
 
     static void proxy_pass_finalize_handler(HttpRequest* req, int rc);
 };

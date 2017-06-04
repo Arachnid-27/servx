@@ -34,6 +34,7 @@ int HttpRequestBody::read(const http_req_handler_t& h) {
         // TODO: don't copy it
         memmove(buf->get_pos(), pre_buf->get_pos(), pre);
         pre_buf->move_pos(pre);
+        buf->move_last(pre);
         recv += pre;
     }
 

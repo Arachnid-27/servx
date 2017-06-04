@@ -37,7 +37,9 @@ int HttpProxyModule::proxy_pass_content_handler(HttpRequest* req) {
     auto conf = req->get_location()->get_conf<HttpProxyModule>();
     HttpUpstreamRequest *hur =
         new HttpUpstreamRequest(conf->upstreams->get_server(), req,
-        proxy_pass_response_handler, proxy_pass_finalize_handler);
+        proxy_pass_response_header_handler,
+        proxy_pass_response_body_handler,
+        proxy_pass_finalize_handler);
 
     auto ctx = new HttpProxyRequestContext;
     ctx->hur = std::unique_ptr<HttpUpstreamRequest>(hur);
@@ -53,12 +55,18 @@ int HttpProxyModule::proxy_pass_request_handler(HttpRequest* req) {
     return ctx->hur->connect();
 }
 
-int HttpProxyModule::proxy_pass_response_handler(
+int HttpProxyModule::proxy_pass_response_header_handler(
+    HttpRequest* req, Buffer* buf) {
+    // TODO: sometime we should buffer it
+    int n = req->get_connection()->send_data(buf, buf->get_size());
+
+    return SERVX_AGAIN;
+}
+
+int HttpProxyModule::proxy_pass_response_body_handler(
     HttpRequest* req, Buffer* buf) {
     int n = req->get_connection()->send_data(buf, buf->get_size());
 
-    // TODO: parse
-    Logger::instance()->debug("send %d bytes", n);
     return SERVX_AGAIN;
 }
 

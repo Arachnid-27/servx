@@ -1,8 +1,179 @@
-#include "http_request_header.h"
+#include "http_header.h"
 
 #include "http_request.h"
+#include "logger.h"
 
 namespace servx {
+
+int HttpHeader::parse_headers() {
+    // allow underscores
+    static uint8_t lowercase[] = {
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 , '-',  0 ,  0 ,
+        '0', '1', '2', '3', '4', '5', '6', '7',
+        '8', '9',  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 , 'a', 'b', 'c', 'd', 'e', 'f', 'g',
+        'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
+        'p', 'q', 'r', 's', 't', 'u', 'v', 'w',
+        'x', 'y', 'z',  0 ,  0 ,  0 ,  0 ,  0 ,
+        '_', 'a', 'b', 'c', 'd', 'e', 'f', 'g',
+        'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
+        'p', 'q', 'r', 's', 't', 'u', 'v', 'w',
+        'x', 'y', 'z',  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
+    };
+
+    char *start = buffer->get_pos();
+    char *last = buffer->get_last();
+    char ch;
+
+    for (char *p = start; p < last; ++p) {
+        ch = *p;
+
+        switch (state) {
+        case PARSE_LINE_DONE:
+            switch (ch) {
+            case CR:
+                state = PARSE_LAST_CR_LF_CR_LF;
+                break;
+            case LF:
+                temp = "";
+                state = PARSE_DONE;
+                buffer->set_pos(p + 1);
+                return SERVX_OK;
+            default:
+                ch = lowercase[static_cast<uint8_t>(ch)];
+                if (ch) {
+                    *p = ch;
+                    state = PARSE_HEADERS_NAME;
+                    break;
+                }
+                return SERVX_ERROR;
+            }
+
+            break;
+
+        case PARSE_HEADERS_NAME:
+            switch (ch) {
+            case ':':
+                temp = std::string(start, p);
+                start = p + 1;
+                state = PARSE_HEADERS_COLON;
+                break;
+            default:
+                ch = lowercase[static_cast<uint8_t>(ch)];
+                if (ch) {
+                    *p = ch;
+                    break;
+                }
+                return SERVX_ERROR;
+            }
+
+            break;
+
+        case PARSE_HEADERS_COLON:
+            switch (ch) {
+            case ' ':
+                break;
+            case '\0':
+                return SERVX_ERROR;
+            default:
+                start = p;
+                state = PARSE_HEADERS_VALUE;
+                break;
+            }
+
+            break;
+
+        case PARSE_HEADERS_VALUE:
+            switch (ch) {
+            case CR:
+                headers.emplace(std::move(temp), std::string(start, p));
+                start = p + 1;
+                state = PARSE_LAST_CR_LF;
+                break;
+            case LF:
+                headers.emplace(std::move(temp), std::string(start, p));
+                start = p + 1;
+                state = PARSE_LAST_CR_LF_CR;
+                break;
+            case '\0':
+                return SERVX_ERROR;
+            }
+
+            break;
+
+        case PARSE_LAST_CR:
+            switch (ch) {
+            case ' ':
+                break;
+            case CR:
+                state = PARSE_LAST_CR_LF;
+                break;
+            case LF:
+                start = p + 1;
+                state = PARSE_LINE_DONE;
+                break;
+            }
+
+            return SERVX_ERROR;
+
+        case PARSE_LAST_CR_LF:
+            if (ch == LF) {
+                start = p + 1;
+                state = PARSE_LINE_DONE;
+                break;
+            }
+
+            return SERVX_ERROR;
+
+        case PARSE_LAST_CR_LF_CR:
+            switch (ch) {
+            case CR:
+                state = PARSE_LAST_CR_LF_CR_LF;
+                break;
+            case LF:
+                return SERVX_OK;
+            default:
+                return SERVX_ERROR;
+            }
+
+            break;
+
+        case PARSE_LAST_CR_LF_CR_LF:
+            if (ch == LF) {
+                temp = "";
+                state = PARSE_DONE;
+                buffer->set_pos(p + 1);
+                return SERVX_OK;
+            }
+
+            return SERVX_ERROR;
+        }
+    }
+
+    buffer->set_pos(start);
+    return SERVX_AGAIN;
+}
 
 int HttpRequestHeader::parse_request_line() {
     static const char* slash = "/";
@@ -22,6 +193,7 @@ int HttpRequestHeader::parse_request_line() {
 
             if (ch >= 'A' && ch <= 'Z') {
                 state = PARSE_METHOD;
+                start = p;
                 break;
             }
 
@@ -319,7 +491,7 @@ int HttpRequestHeader::parse_request_line() {
             case LF:
                 version = std::string(start, p);
                 buffer->set_pos(p + 1);
-                state = PARSE_START;
+                state = PARSE_LINE_DONE;
                 return SERVX_OK;
             default:
                 return SERVX_ERROR;
@@ -338,7 +510,7 @@ int HttpRequestHeader::parse_request_line() {
                 break;
             case LF:
                 buffer->set_pos(p + 1);
-                state = PARSE_START;
+                state = PARSE_LINE_DONE;
                 return SERVX_OK;
             default:
                 return SERVX_ERROR;
@@ -349,177 +521,7 @@ int HttpRequestHeader::parse_request_line() {
         case PARSE_LAST_CR_LF:
             if (ch == LF) {
                 buffer->set_pos(p + 1);
-                state = PARSE_START;
-                return SERVX_OK;
-            }
-
-            return SERVX_ERROR;
-        }
-    }
-
-    buffer->set_pos(start);
-    return SERVX_AGAIN;
-}
-
-int HttpRequestHeader::parse_request_headers() {
-    // allow underscores
-    static uint8_t lowercase[] = {
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 , '-',  0 ,  0 ,
-        '0', '1', '2', '3', '4', '5', '6', '7',
-        '8', '9',  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 , 'a', 'b', 'c', 'd', 'e', 'f', 'g',
-        'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
-        'p', 'q', 'r', 's', 't', 'u', 'v', 'w',
-        'x', 'y', 'z',  0 ,  0 ,  0 ,  0 ,  0 ,
-        '_', 'a', 'b', 'c', 'd', 'e', 'f', 'g',
-        'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
-        'p', 'q', 'r', 's', 't', 'u', 'v', 'w',
-        'x', 'y', 'z',  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-         0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,
-    };
-
-    char *start = buffer->get_pos();
-    char *last = buffer->get_last();
-    char ch;
-
-    for (char *p = start; p < last; ++p) {
-        ch = *p;
-
-        switch (state) {
-        case PARSE_START:
-            switch (ch) {
-            case CR:
-                state = PARSE_LAST_CR_LF_CR_LF;
-                break;
-            case LF:
-                temp = "";
-                state = PARSE_DONE;
-                buffer->set_pos(p + 1);
-                return SERVX_OK;
-            default:
-                ch = lowercase[static_cast<uint8_t>(ch)];
-                if (ch) {
-                    *p = ch;
-                    state = PARSE_HEADERS_NAME;
-                    break;
-                }
-                return SERVX_ERROR;
-            }
-
-            break;
-
-        case PARSE_HEADERS_NAME:
-            switch (ch) {
-            case ':':
-                temp = std::string(start, p);
-                start = p + 1;
-                state = PARSE_HEADERS_COLON;
-                break;
-            default:
-                ch = lowercase[static_cast<uint8_t>(ch)];
-                if (ch) {
-                    *p = ch;
-                    break;
-                }
-                return SERVX_ERROR;
-            }
-
-            break;
-
-        case PARSE_HEADERS_COLON:
-            switch (ch) {
-            case ' ':
-                break;
-            case '\0':
-                return SERVX_ERROR;
-            default:
-                start = p;
-                state = PARSE_HEADERS_VALUE;
-                break;
-            }
-
-            break;
-
-        case PARSE_HEADERS_VALUE:
-            switch (ch) {
-            case CR:
-                headers.emplace(std::move(temp), std::string(start, p));
-                start = p + 1;
-                state = PARSE_LAST_CR_LF;
-                break;
-            case LF:
-                headers.emplace(std::move(temp), std::string(start, p));
-                start = p + 1;
-                state = PARSE_LAST_CR_LF_CR;
-                break;
-            case '\0':
-                return SERVX_ERROR;
-            }
-
-            break;
-
-        case PARSE_LAST_CR:
-            switch (ch) {
-            case ' ':
-                break;
-            case CR:
-                state = PARSE_LAST_CR_LF;
-                break;
-            case LF:
-                start = p + 1;
-                state = PARSE_START;
-                break;
-            }
-
-            return SERVX_ERROR;
-
-        case PARSE_LAST_CR_LF:
-            if (ch == LF) {
-                start = p + 1;
-                state = PARSE_START;
-                break;
-            }
-
-            return SERVX_ERROR;
-
-        case PARSE_LAST_CR_LF_CR:
-            switch (ch) {
-            case CR:
-                state = PARSE_LAST_CR_LF_CR_LF;
-                break;
-            case LF:
-                return SERVX_OK;
-            default:
-                return SERVX_ERROR;
-            }
-
-            break;
-
-        case PARSE_LAST_CR_LF_CR_LF:
-            if (ch == LF) {
-                temp = "";
-                state = PARSE_DONE;
-                buffer->set_pos(p + 1);
+                state = PARSE_LINE_DONE;
                 return SERVX_OK;
             }
 
@@ -568,6 +570,171 @@ HttpMethod HttpRequestHeader::parse_request_method() {
     }
 
     return HTTP_METHOD_UNKONWN;
+}
+
+int HttpResponseHeader::parse_response_line() {
+    static const uint8_t valid[] = {
+        0x00, 0x00, 0x00, 0x00, 0x01, 0x20, 0xff, 0x03,
+        0xfe, 0xff, 0xff, 0x07, 0xfe, 0xff, 0xff, 0x07
+    };
+
+    char *start = buffer->get_pos();
+    char *last = buffer->get_last();
+    char ch;
+
+    for (char *p = start; p < last; ++p) {
+        ch = *p;
+
+        switch (state) {
+        case PARSE_START:
+            if (ch == CR || ch == LF) {
+                break;
+            }
+
+            if (ch == 'H') {
+                state = PARSE_VERSION_HT;
+                start = p;
+                break;
+            }
+
+            return SERVX_ERROR;
+
+        case PARSE_VERSION_HT:
+            if (ch == 'T') {
+                state = PARSE_VERSION_HTT;
+                start = p + 1;
+                break;
+            }
+
+            return SERVX_ERROR;
+
+        case PARSE_VERSION_HTT:
+            if (ch == 'T') {
+                state = PARSE_VERSION_HTTP;
+                start = p + 1;
+                break;
+            }
+
+            return SERVX_ERROR;
+
+        case PARSE_VERSION_HTTP:
+            if (ch == 'P') {
+                state = PARSE_VERSION_HTTP_SLASH;
+                start = p + 1;
+                break;
+            }
+
+            return SERVX_ERROR;
+
+        case PARSE_VERSION_HTTP_SLASH:
+            if (ch == '/') {
+                state = PARSE_VERSION_HTTP_SLASH_NUMBER;
+                start = p + 1;
+                break;
+            }
+
+            return SERVX_ERROR;
+
+        case PARSE_VERSION_HTTP_SLASH_NUMBER:
+            if (ch >= '0' && ch <= '9') {
+                state = PARSE_VERSION_HTTP_SLASH_VERSION;
+                break;
+            }
+
+            return SERVX_ERROR;
+
+        case PARSE_VERSION_HTTP_SLASH_VERSION:
+            if ((ch >= '0' && ch <= '9') || ch == '.') {
+                break;
+            }
+
+            if (ch == ' ') {
+                version = std::string(start, p);
+                start = p + 1;
+                state = PARSE_STATUS_CODE_1;
+                break;
+            } else {
+                return SERVX_ERROR;
+            }
+
+            break;
+
+        case PARSE_STATUS_CODE_1:
+            if (ch >= '0' && ch <= '9') {
+                start = p;
+                state = PARSE_STATUS_CODE_2;
+                break;
+            }
+
+            if (ch != ' ') {
+                return SERVX_ERROR;
+            }
+
+            break;
+
+        case PARSE_STATUS_CODE_2:
+            if (ch >= '0' && ch <= '9') {
+                state = PARSE_STATUS_CODE_3;
+                break;
+            }
+
+            return SERVX_ERROR;
+
+        case PARSE_STATUS_CODE_3:
+            if (ch >= '0' && ch <= '9') {
+                status = std::string(start, p);
+                start = p + 1;
+                state = PARSE_STATUS_BEFORE_DESCRIPTION;
+                break;
+            }
+
+            return SERVX_ERROR;
+
+        case PARSE_STATUS_BEFORE_DESCRIPTION:
+            if (valid[ch >> 3] & (1 << (ch & 7))) {
+                if (ch != ' ') {
+                    start = p;
+                    state = PARSE_STATUS_DESCRIPTION;
+                }
+                break;
+            }
+
+            return SERVX_ERROR;
+
+        case PARSE_STATUS_DESCRIPTION:
+            if (valid[ch >> 3] & (1 << (ch & 7))) {
+                break;
+            }
+
+            switch(ch) {
+            case CR:
+                description = std::string(start, p);
+                state = PARSE_LAST_CR_LF;
+                break;
+            case LF:
+                description = std::string(start, p);
+                buffer->set_pos(p + 1);
+                state = PARSE_LINE_DONE;
+                return SERVX_OK;
+            default:
+                return SERVX_ERROR;
+            }
+
+            break;
+
+        case PARSE_LAST_CR_LF:
+            if (ch == LF) {
+                buffer->set_pos(p + 1);
+                state = PARSE_LINE_DONE;
+                return SERVX_OK;
+            }
+
+            return SERVX_ERROR;
+        }
+    }
+
+    buffer->set_pos(start);
+    return SERVX_AGAIN;
 }
 
 }

@@ -4,13 +4,21 @@
 #include "core.h"
 #include "event_module.h"
 #include "http.h"
-#include "logger.h"
 #include "timer.h"
 
 namespace servx {
 
 HttpUpstreamRequest::~HttpUpstreamRequest() {
-    for (Buffer *buf : response_bufs) {
+    if (request_header_buf) {
+        server->ret_body_buf(request_header_buf);
+    }
+    if (response_header_buf) {
+        server->ret_body_buf(response_header_buf);
+    }
+    for (Buffer *buf : request_body_bufs) {
+        server->ret_body_buf(buf);
+    }
+    for (Buffer *buf : response_body_bufs) {
         server->ret_body_buf(buf);
     }
 }
@@ -72,16 +80,8 @@ int HttpUpstreamRequest::connect() {
 }
 
 void HttpUpstreamRequest::wait_connect_handler(Event* ev) {
-    if (ev->is_timeout()) {
-        Logger::instance()->warn("upstream timeout");
-        ev->get_connection()->set_timeout(true);
-        close(HTTP_GATEWAY_TIME_OUT);
+    if (check_timeout(ev, HTTP_BAD_GATEWAY)) {
         return;
-    }
-
-    if (ev->is_timer()) {
-        // TODO
-        Timer::instance()->del_timer(ev);
     }
 
     Logger::instance()->debug("connect upstream success");
@@ -105,39 +105,159 @@ void HttpUpstreamRequest::wait_connect_handler(Event* ev) {
 }
 
 void HttpUpstreamRequest::send_request_handler(Event* ev) {
-    if (ev->is_timeout()) {
-        Logger::instance()->warn("upstream timeout");
-        ev->get_connection()->set_timeout(true);
-        close(HTTP_INTERNAL_SERVER_ERROR);
+    if (check_timeout(ev, HTTP_INTERNAL_SERVER_ERROR)) {
         return;
     }
 
     int rc = send_request();
-
     if (rc == SERVX_ERROR) {
         close(HTTP_INTERNAL_SERVER_ERROR);
     }
 }
 
-void HttpUpstreamRequest::recv_response_handler(Event* ev) {
-    if (ev->is_timeout()) {
-        Logger::instance()->warn("upstream timeout");
-        ev->get_connection()->set_timeout(true);
-        close(HTTP_BAD_GATEWAY);
+void HttpUpstreamRequest::recv_response_line_handler(Event* ev) {
+    if (check_timeout(ev, HTTP_BAD_GATEWAY)) {
         return;
     }
 
-    response_bufs.emplace_back(server->get_body_buf());
+    if (response_header_buf == nullptr) {
+        Logger::instance()->debug("init request header buf");
+        response_header_buf = server->get_body_buf();
+        header = std::unique_ptr<HttpResponseHeader>(
+            new HttpResponseHeader(response_header_buf));
+    }
 
+    if (!conn->get_read_event()->is_timer()) {
+        // TODO: del timer
+        Timer::instance()->add_timer(conn->get_read_event(), 120000);
+    }
+
+    int rc = read_response_header();
+    if (rc != SERVX_OK) {
+        return;
+    }
+
+    rc = header->parse_response_line();
+    switch (rc) {
+    case SERVX_ERROR:
+        close(SERVX_ERROR);
+        return;
+    case SERVX_OK:
+        Logger::instance()->debug("parse upstream line success");
+        conn->get_read_event()->set_handler([this](Event* ev) {
+                this->recv_response_headers_handler(ev);
+            });
+
+        if (response_header_buf->get_size() > 0) {
+            recv_response_headers_handler(ev);
+        }
+        return;
+    }
+
+    if (check_header_buf_full()) {
+        return;
+    }
+}
+
+void HttpUpstreamRequest::recv_response_headers_handler(Event* ev) {
+    if (check_timeout(ev, HTTP_BAD_GATEWAY)) {
+        return;
+    }
+
+    int rc = read_response_header();
+    if (rc != SERVX_OK) {
+        return;
+    }
+
+    rc = header->parse_headers();
+    switch (rc) {
+    case SERVX_ERROR:
+        close(SERVX_ERROR);
+        return;
+    case SERVX_OK:
+        response_header_done();
+        return;
+    }
+
+    if (check_header_buf_full()) {
+        return;
+    }
+}
+
+void HttpUpstreamRequest::response_header_done() {
+    auto length = header->get_header("content-length");
+    if (!length.empty()) {
+        content_length = atol(length.c_str());
+        if (content_length == 0 && length != "0") {
+            close(HTTP_BAD_GATEWAY);
+            return;
+        }
+    }
+
+    Logger::instance()->debug("content-length = %d", content_length);
+
+    if (content_length == 0 || content_length == -1) {
+        close(SERVX_OK);
+    } else {
+        Buffer *buf = server->get_body_buf();
+        int size = response_header_buf->get_size();
+        if (size > 0) {
+            memmove(buf->get_pos(), response_header_buf->get_pos(), size);
+            buf->move_last(size);
+        }
+        response_body_bufs.emplace_back(buf);
+
+        response_header_buf->set_last(response_header_buf->get_pos());
+        response_header_buf->set_pos(response_header_buf->get_start());
+        response_header_handler(request, response_header_buf);
+
+        conn->get_read_event()->set_handler([this](Event* ev) {
+                this->recv_response_body_handler(ev);
+            });
+
+        if (size > 0) {
+            // TODO: recv body
+            recv += size;
+            handle_response_body();
+        }
+    }
+}
+
+int HttpUpstreamRequest::handle_response_body() {
+    Buffer *buf = response_body_bufs.back();
+    int rc = response_body_handler(request, buf);
+
+    if (rc == SERVX_ERROR) {
+        Logger::instance()->info("response_body_handler success");
+        close(rc);
+        return SERVX_ERROR;
+    }
+
+    if (recv == content_length) {
+        close(SERVX_OK);
+        return SERVX_OK;
+    }
+
+    if (rc == SERVX_OK) {
+        // TODO: discard
+    }
+
+    return SERVX_AGAIN;
+}
+
+void HttpUpstreamRequest::recv_response_body_handler(Event* ev) {
+    Buffer *buf;
     int n, rc, size;
 
-    while (true) {
-        Buffer *buf = response_bufs.back();
+    if (ev->is_timer()) {
+        // TODO
+        Timer::instance()->del_timer(ev);
+    }
 
+    while (true) {
+        buf = response_body_bufs.back();
         size = buf->get_remain();
         n = conn->recv_data(buf, size);
-
-        Logger::instance()->debug("recv %d bytes", n);
 
         if (n < 0) {
             Logger::instance()->error("get data from upstream error");
@@ -152,36 +272,27 @@ void HttpUpstreamRequest::recv_response_handler(Event* ev) {
             return;
         }
 
-        // TODO: header and body handler
-        rc = response_handler(request, buf);
-
-        if (rc == SERVX_OK || rc == SERVX_ERROR) {
-            Logger::instance()->info("response_handler success");
-            close(rc);
+        rc = handle_response_body();
+        if (rc != SERVX_AGAIN) {
             return;
         }
 
-        if (n == size) {
-            response_bufs.emplace_back(server->get_body_buf());
-            continue;
-        }
+        // TODO: maybe discard
 
-        if (!conn->get_read_event()->is_timer()) {
-            // TODO: del timer
-            Timer::instance()->add_timer(conn->get_read_event(), 120000);
-            break;
+        if (n != size) {
+            return;
         }
+        response_body_bufs.emplace_back(server->get_body_buf());
     }
 }
 
 void HttpUpstreamRequest::build_request() {
     // copy it
     request_body_bufs = request->get_request_body()->get_body_buffer();
-    request_header_bufs.emplace_back(server->get_body_buf());
+    request_header_buf = server->get_body_buf();
 
     int n;
-    Buffer *buf = request_header_bufs.back();
-    char *pos = buf->get_pos();
+    char *pos = request_header_buf->get_pos();
 
     n = sprintf(pos, "%s %s%s%s HTTP/1.1\r\n",
         request->get_request_header()->get_method().c_str(),
@@ -189,7 +300,7 @@ void HttpUpstreamRequest::build_request() {
         request->get_request_header()->get_args().empty() ? "" : "?",
         request->get_request_header()->get_args().c_str());
     pos += n;
-    buf->set_last(pos);
+    request_header_buf->set_last(pos);
 
     // TODO: keep-alive
     // TODO: host
@@ -201,51 +312,58 @@ void HttpUpstreamRequest::build_request() {
     while (hb != he) {
         // TODO: avoid compare
         if (hb->first != "host" && hb->first != "connection") {
-            n = snprintf(pos, buf->get_remain(), "%s:%s\r\n",
+            n = snprintf(pos, request_header_buf->get_remain(), "%s:%s\r\n",
                          hb->first.c_str(), hb->second.c_str());
-            if (pos + n == buf->get_end()) {
-                request_header_bufs.emplace_back(server->get_body_buf());
-                buf = request_header_bufs.back();
-                pos = buf->get_pos();
-                n = snprintf(pos, buf->get_remain(), "%s:%s\r\n",
-                             hb->first.c_str(), hb->second.c_str());
+            if (request_header_buf->get_remain() < 2) {
+                // TODO: error handler
+                Logger::instance()->info("header too large");
+                break;
             }
             pos += n;
-            buf->set_last(pos);
+            request_header_buf->set_last(pos);
         }
         ++hb;
     }
 
-    if (buf->get_remain() < 2) {
-        request_header_bufs.emplace_back(server->get_body_buf());
-        buf = request_header_bufs.back();
-        pos = buf->get_pos();
-    }
-
     pos[0] = '\r';
     pos[1] = '\n';
-    buf->set_last(pos + 2);
+    request_header_buf->set_last(pos + 2);
 
     Logger::instance()->debug("build request success");
 }
 
-int HttpUpstreamRequest::send_request() {
-    std::list<Buffer*>::iterator first, last, iter;
+int HttpUpstreamRequest::read_response_header() {
+    int rc = conn->recv_data(response_header_buf,
+        response_header_buf->get_remain());
 
-    if (!request_header_bufs.empty()) {
-        first = request_header_bufs.begin();
-        last = request_header_bufs.end();
-        iter = conn->send_chain(first, last);
+    switch (rc) {
+    case 0:
+        Logger::instance()->info("upstream permaturely closed connection");
+        conn->get_read_event()->set_eof(true);
+        close(HTTP_BAD_GATEWAY);
+        return SERVX_ERROR;
+    case SERVX_ERROR:
+        Logger::instance()->warn("upstream error");
+        close(HTTP_INTERNAL_SERVER_ERROR);
+        return SERVX_ERROR;
+    case SERVX_AGAIN:
+        return SERVX_AGAIN;
+    }
+
+    return SERVX_OK;
+}
+
+int HttpUpstreamRequest::send_request() {
+    auto size = request_header_buf->get_size();
+
+    if (size > 0) {
+        int n = conn->send_data(request_header_buf, size);
 
         if (conn->is_error()) {
             return SERVX_ERROR;
         }
 
-        std::for_each(first, iter,
-            [this](Buffer* buf) { server->ret_body_buf(buf); });
-        request_header_bufs.erase(first, iter);
-
-        if (iter != last) {
+        if (static_cast<uint32_t>(n) != size) {
             return SERVX_AGAIN;
         }
 
@@ -253,15 +371,15 @@ int HttpUpstreamRequest::send_request() {
     }
 
     if (!request_body_bufs.empty()) {
-        first = request_body_bufs.begin();
-        last = request_body_bufs.end();
-        iter = conn->send_chain(first, last);
+        auto first = request_body_bufs.begin();
+        auto last = request_body_bufs.end();
+        auto iter = conn->send_chain(first, last);
 
         if (conn->is_error()) {
             return SERVX_ERROR;
         }
 
-        request_header_bufs.erase(first, iter);
+        request_body_bufs.erase(first, iter);
 
         if (iter != last) {
             return SERVX_AGAIN;
@@ -271,11 +389,17 @@ int HttpUpstreamRequest::send_request() {
     }
 
     conn->get_read_event()->set_handler([this](Event* ev) {
-            this->recv_response_handler(ev);
+            this->recv_response_line_handler(ev);
         });
     conn->get_write_event()->set_handler(empty_write_handler);
 
     return SERVX_OK;
+}
+
+void HttpUpstreamRequest::process_line() {
+}
+
+void HttpUpstreamRequest::process_headers() {
 }
 
 }

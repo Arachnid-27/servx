@@ -1,6 +1,8 @@
 #ifndef _HTTP_UPSTREAM_SERVER_H_
 #define _HTTP_UPSTREAM_SERVER_H_
 
+#include <memory>
+
 #include "buffer.h"
 #include "inet.h"
 
@@ -25,7 +27,7 @@ public:
 
 private:
     std::unique_ptr<TcpConnectSocket> socket;
-    std::vector<Buffer> all_bufs;
+    std::vector<std::unique_ptr<Buffer>> all_bufs;
     std::vector<Buffer*> free_body_bufs;
 };
 

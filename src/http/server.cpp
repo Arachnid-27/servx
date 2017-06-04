@@ -34,8 +34,9 @@ Location* Server::find_location(const std::string& uri) {
 
 Buffer* Server::get_body_buf() {
     if (free_body_bufs.empty()) {
-        all_bufs.emplace_back(get_core_conf()->client_body_buffer_size);
-        free_body_bufs.emplace_back(&all_bufs.back());
+        int size = get_core_conf()->client_body_buffer_size;
+        all_bufs.emplace_back(new Buffer(size));
+        free_body_bufs.emplace_back(all_bufs.back().get());
     }
 
     Buffer *buf = free_body_bufs.back();

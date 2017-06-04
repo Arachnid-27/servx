@@ -1,5 +1,5 @@
-#ifndef _HTTP_REQUEST_HEADER_H_
-#define _HTTP_REQUEST_HEADER_H_
+#ifndef _HTTP_HEADER_H_
+#define _HTTP_HEADER_H_
 
 #include <string>
 #include <unordered_map>
@@ -9,9 +9,28 @@
 
 namespace servx {
 
-class HttpRequestHeader {
-    friend class HttpRequest;
+class HttpHeader {
+public:
+    HttpHeader(Buffer *buf): buffer(buf), state(PARSE_START) {}
 
+    HttpHeader(const HttpHeader&) = delete;
+    HttpHeader(HttpHeader&&) = delete;
+    HttpHeader& operator=(const HttpHeader&) = delete;
+    HttpHeader& operator=(HttpHeader&&) = delete;
+
+    ~HttpHeader() = default;
+
+    int parse_headers();
+
+    const std::string& get_header(const std::string key) const {
+        auto iter = headers.find(key);
+        return iter == headers.end() ? temp : iter->second;
+    }
+
+    const std::unordered_map<std::string, std::string>&
+    get_headers() const { return headers; }
+
+protected:
     enum HttpParseState {
         PARSE_START,
 
@@ -28,6 +47,7 @@ class HttpRequestHeader {
         PARSE_ABS_PATH,
         PARSE_ABS_PATH_ARGS,
         PARSE_ABS_PATH_FRAGMENT,
+
         PARSE_VERSION_H,
         PARSE_VERSION_HT,
         PARSE_VERSION_HTT,
@@ -35,6 +55,14 @@ class HttpRequestHeader {
         PARSE_VERSION_HTTP_SLASH,
         PARSE_VERSION_HTTP_SLASH_NUMBER,
         PARSE_VERSION_HTTP_SLASH_VERSION,
+
+        PARSE_STATUS_CODE_1,
+        PARSE_STATUS_CODE_2,
+        PARSE_STATUS_CODE_3,
+        PARSE_STATUS_BEFORE_DESCRIPTION,
+        PARSE_STATUS_DESCRIPTION,
+
+        PARSE_LINE_DONE,
 
         PARSE_HEADERS_NAME,
         PARSE_HEADERS_COLON,
@@ -47,26 +75,29 @@ class HttpRequestHeader {
 
         PARSE_DONE
     };
+
+    Buffer* buffer;
+
+    int state;
+
+    std::string temp;
+    std::unordered_map<std::string, std::string> headers;
+};
+
+class HttpRequestHeader: public HttpHeader {
+    friend class HttpRequest;
 public:
-    HttpRequestHeader(Buffer *buf): buffer(buf), state(PARSE_START) {}
+    HttpRequestHeader(Buffer *buf): HttpHeader(buf) {}
+
+    ~HttpRequestHeader() = default;
 
     int parse_request_line();
 
-    int parse_request_headers();
-
     HttpMethod parse_request_method();
-
-    const std::string& get_header(const std::string key) const {
-        auto iter = headers.find(key);
-        return iter == headers.end() ? temp : iter->second;
-    }
 
     const std::string& get_method() const { return method; }
     const std::string& get_uri() const { return uri; }
     const std::string& get_args() const { return args; }
-
-    const std::unordered_map<std::string, std::string>&
-    get_headers() const { return headers; }
 
 private:
     char LOWER_CASE(char ch) const { return (ch | 0x20); }
@@ -90,10 +121,6 @@ private:
                *reinterpret_cast<const uint32_t*>(p2 + 4);
     }
 
-    Buffer* buffer;
-
-    int state;
-
     bool quoted;
 
     std::string method;
@@ -103,9 +130,20 @@ private:
     std::string uri;
     std::string args;
     std::string version;
+};
 
-    std::string temp;
-    std::unordered_map<std::string, std::string> headers;
+class HttpResponseHeader: public HttpHeader {
+public:
+    HttpResponseHeader(Buffer *buf): HttpHeader(buf) {}
+
+    ~HttpResponseHeader() = default;
+
+    int parse_response_line();
+
+private:
+    std::string version;
+    std::string status;
+    std::string description;
 };
 
 }
