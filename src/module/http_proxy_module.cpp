@@ -71,6 +71,7 @@ int HttpProxyModule::proxy_pass_response_body_handler(
 }
 
 void HttpProxyModule::proxy_pass_finalize_handler(HttpRequest* req, int rc) {
+    req->close(rc);
 }
 
 }

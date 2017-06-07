@@ -50,9 +50,6 @@ public:
 
     HttpResponseHeader* get_response_header() const { return header.get(); }
 
-    void process_line();
-    void process_headers();
-
     void close(int rc);
 
 private:
@@ -75,7 +72,8 @@ private:
         return false;
     }
 
-    void response_header_done();
+    void recv_response_headers(Event* ev);
+    void response_header_done(Event* ev);
     void build_request();
     int handle_response_body();
     int read_response_header();
@@ -84,8 +82,6 @@ private:
     HttpUpstreamServer *server;
     HttpRequest *request;
     Connection* conn;
-
-    std::unique_ptr<TcpConnectSocket> socket;
 
     std::unordered_map<std::string, std::string> extra_headers;
 

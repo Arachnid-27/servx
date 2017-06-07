@@ -25,24 +25,25 @@ HttpUpstreamRequest::~HttpUpstreamRequest() {
 
 void HttpUpstreamRequest::close(int rc) {
     // TODO: keep-alive
+    Logger::instance()->debug("close http upstream request, rc = %d", rc);
     finalize_handler(request, rc);
     conn->close();
 }
 
 int HttpUpstreamRequest::connect() {
-    socket = std::unique_ptr<TcpConnectSocket>(
-        new TcpConnectSocket(server->get_socket()));
-    int rc = socket->connect();
+    auto &socket = server->get_socket();
 
+    int rc = socket.connect();
     if (rc == SERVX_ERROR) {
         Logger::instance()->warn("connect error");
         return SERVX_ERROR;
     }
 
-    Logger::instance()->debug("connect fd = %d", socket->get_fd());
+    Logger::instance()->debug("connect fd = %d", socket.get_fd());
 
     conn = ConnectionPool::instance()
-        ->get_connection(socket->get_fd(), false);
+        ->get_connection(socket.get_fd(), false);
+    socket.release();
 
     if (conn == nullptr || !add_connection(conn)) {
         Logger::instance()->warn("add connection error");
@@ -143,13 +144,14 @@ void HttpUpstreamRequest::recv_response_line_handler(Event* ev) {
         close(SERVX_ERROR);
         return;
     case SERVX_OK:
-        Logger::instance()->debug("parse upstream line success");
+        Logger::instance()->debug("parse upstream line success %s %s",
+            header->status.c_str(), header->description.c_str());
         conn->get_read_event()->set_handler([this](Event* ev) {
                 this->recv_response_headers_handler(ev);
             });
 
         if (response_header_buf->get_size() > 0) {
-            recv_response_headers_handler(ev);
+            recv_response_headers(ev);
         }
         return;
     }
@@ -169,13 +171,17 @@ void HttpUpstreamRequest::recv_response_headers_handler(Event* ev) {
         return;
     }
 
-    rc = header->parse_headers();
+    recv_response_headers(ev);
+}
+
+void HttpUpstreamRequest::recv_response_headers(Event* ev) {
+    int rc = header->parse_headers();
     switch (rc) {
     case SERVX_ERROR:
         close(SERVX_ERROR);
         return;
     case SERVX_OK:
-        response_header_done();
+        response_header_done(ev);
         return;
     }
 
@@ -184,7 +190,7 @@ void HttpUpstreamRequest::recv_response_headers_handler(Event* ev) {
     }
 }
 
-void HttpUpstreamRequest::response_header_done() {
+void HttpUpstreamRequest::response_header_done(Event* ev) {
     auto length = header->get_header("content-length");
     if (!length.empty()) {
         content_length = atol(length.c_str());
@@ -197,6 +203,10 @@ void HttpUpstreamRequest::response_header_done() {
     Logger::instance()->debug("content-length = %d", content_length);
 
     if (content_length == 0 || content_length == -1) {
+        response_header_buf->set_last(response_header_buf->get_pos());
+        response_header_buf->set_pos(response_header_buf->get_start());
+        response_header_handler(request, response_header_buf);
+
         close(SERVX_OK);
     } else {
         Buffer *buf = server->get_body_buf();
@@ -216,9 +226,12 @@ void HttpUpstreamRequest::response_header_done() {
             });
 
         if (size > 0) {
-            // TODO: recv body
             recv += size;
-            handle_response_body();
+            if (ev->is_ready()) {
+                recv_response_body_handler(ev);
+            } else {
+                handle_response_body();
+            }
         }
     }
 }
@@ -228,7 +241,7 @@ int HttpUpstreamRequest::handle_response_body() {
     int rc = response_body_handler(request, buf);
 
     if (rc == SERVX_ERROR) {
-        Logger::instance()->info("response_body_handler success");
+        Logger::instance()->info("response_body_handler error");
         close(rc);
         return SERVX_ERROR;
     }
@@ -266,12 +279,14 @@ void HttpUpstreamRequest::recv_response_body_handler(Event* ev) {
         }
 
         if (n == 0) {
-            Logger::instance()->info("upstream permaturely closed connection");
+            Logger::instance()->info(
+                "recv response body, upstream permaturely closed connection");
             conn->get_read_event()->set_eof(true);
             close(HTTP_BAD_GATEWAY);
             return;
         }
 
+        recv += n;
         rc = handle_response_body();
         if (rc != SERVX_AGAIN) {
             return;
@@ -338,7 +353,8 @@ int HttpUpstreamRequest::read_response_header() {
 
     switch (rc) {
     case 0:
-        Logger::instance()->info("upstream permaturely closed connection");
+        Logger::instance()->info(
+            "read response header, upstream permaturely closed connection");
         conn->get_read_event()->set_eof(true);
         close(HTTP_BAD_GATEWAY);
         return SERVX_ERROR;
@@ -394,12 +410,6 @@ int HttpUpstreamRequest::send_request() {
     conn->get_write_event()->set_handler(empty_write_handler);
 
     return SERVX_OK;
-}
-
-void HttpUpstreamRequest::process_line() {
-}
-
-void HttpUpstreamRequest::process_headers() {
 }
 
 }

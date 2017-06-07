@@ -150,8 +150,7 @@ public:
 
     int connect();
 
-private:
-    bool connecting;
+    void release() { fd = -1; }
 };
 
 }

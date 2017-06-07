@@ -682,7 +682,7 @@ int HttpResponseHeader::parse_response_line() {
 
         case PARSE_STATUS_CODE_3:
             if (ch >= '0' && ch <= '9') {
-                status = std::string(start, p);
+                status = std::string(start, p + 1);
                 start = p + 1;
                 state = PARSE_STATUS_BEFORE_DESCRIPTION;
                 break;

@@ -77,8 +77,6 @@ int HttpResponse::send_header() {
     Buffer *buf = chain.back();
     char *pos = buf->get_pos();
 
-    Logger::instance()->debug("%p ", pos);
-
     n = sprintf(pos, "HTTP/1.1 %s\r\n", status_lines[status - 10].c_str());
     pos += n;
 
