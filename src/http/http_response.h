@@ -11,9 +11,11 @@
 
 namespace servx {
 
+class HttpRequest;
+
 class HttpResponse {
 public:
-    explicit HttpResponse(Connection* c);
+    explicit HttpResponse(HttpRequest* r);
 
     HttpResponse(const HttpResponse&) = delete;
     HttpResponse(HttpResponse&&) = delete;
@@ -45,15 +47,14 @@ public:
 
     bool is_sent() const { return sent; }
 
+    void set_etag(bool e) { etag = e; };
+
     int send_header();
     int send_body(std::unique_ptr<File>&& p);
     int send_body(std::list<Buffer*>&& chain);
     int send();
 
-    void set_etag(bool e) { etag = e; };
-
-    void set_server(Server* srv) { server = srv; }
-    void set_location(Location* loc) { location = loc; }
+    static void send_response_handler(HttpRequest* r);
 
 private:
     struct Sendable {
@@ -62,9 +63,7 @@ private:
     };
 
     std::unordered_map<std::string, std::string> headers;
-    Connection *conn;
-    Location *location;
-    Server *server;
+    HttpRequest *request;
     long content_length;
     long last_modified_time;
     int status;

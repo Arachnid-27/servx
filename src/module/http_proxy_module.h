@@ -14,6 +14,7 @@ struct HttpProxyLocConf: public ModuleConf {
 
 struct HttpProxyRequestContext: public HttpRequestContext {
     std::unique_ptr<HttpUpstreamRequest> hur;
+    std::list<Buffer*> out;
 };
 
 class HttpProxyModule
@@ -42,6 +43,8 @@ public:
         HttpRequest* req, Buffer* buf);
 
     static void proxy_pass_finalize_handler(HttpRequest* req, int rc);
+
+    static void proxy_pass_write_handler(HttpRequest* ev);
 };
 
 }

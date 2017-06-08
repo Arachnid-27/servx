@@ -74,7 +74,7 @@ private:
 
     void recv_response_headers(Event* ev);
     void response_header_done(Event* ev);
-    void build_request();
+    int build_request();
     int handle_response_body();
     int read_response_header();
     int send_request();

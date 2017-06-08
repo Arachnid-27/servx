@@ -40,8 +40,8 @@ std::string HttpResponse::status_lines[] = {
     "504 Gateway Time-out"
 };
 
-HttpResponse::HttpResponse(Connection* c)
-    : conn(c), content_length(-1),
+HttpResponse::HttpResponse(HttpRequest* r)
+    : request(r), content_length(-1),
       last_modified_time(-1), status(-1),
       header_only(false), chunked(false),
       keep_alive(false), etag(false) {
@@ -50,7 +50,7 @@ HttpResponse::HttpResponse(Connection* c)
 HttpResponse::~HttpResponse() {
     std::for_each(out.begin(), out.end(), [this](Sendable& s)
         { std::for_each(s.chain.begin(), s.chain.end(), [this](Buffer* b)
-            { server->ret_body_buf(b); }); });
+            { request->get_server()->ret_buffer(b); }); });
 }
 
 int HttpResponse::send_header() {
@@ -70,11 +70,10 @@ int HttpResponse::send_header() {
 
     out.emplace_back();
 
-    std::list<Buffer*> &chain = out.back().chain;
-    chain.emplace_back(server->get_body_buf());
-
     int n;
-    Buffer *buf = chain.back();
+    Buffer *buf = request->get_server()->get_buffer();
+    std::list<Buffer*> &chain = out.back().chain;
+    chain.emplace_back(buf);
     char *pos = buf->get_pos();
 
     n = sprintf(pos, "HTTP/1.1 %s\r\n", status_lines[status - 10].c_str());
@@ -133,25 +132,12 @@ int HttpResponse::send_header() {
     for (auto &s : headers) {
         n = snprintf(pos, buf->get_remain(), "%s:%s\r\n",
                      s.first.c_str(), s.second.c_str());
-        // buffer full means that we need alloc a new buffer
-        // but we should discard the last result (don't invoke set_last)
-        // becase we don't know if it is truncated
-        if (pos + n == buf->get_end()) {
-            chain.emplace_back(server->get_body_buf());
-            buf = chain.back();
-            pos = buf->get_pos();
-            n = snprintf(pos, buf->get_remain(), "%s:%s\r\n",
-                         s.first.c_str(), s.second.c_str());
-            // we assume it will success
-        }
         pos += n;
         buf->set_last(pos);
-    }
-
-    if (buf->get_remain() < 2) {
-        chain.emplace_back(server->get_body_buf());
-        buf = chain.back();
-        pos = buf->get_pos();
+        if (buf->get_remain() < 2) {
+            Logger::instance()->warn("response header too large");
+            return SERVX_ERROR;
+        }
     }
 
     pos[0] = '\r';
@@ -188,15 +174,16 @@ int HttpResponse::send() {
         if (!chain.empty()) {
             auto first = chain.begin();
             auto last = chain.end();
-            auto iter = conn->send_chain(first, last);
-            if (conn->is_error()) {
+            auto iter = request->get_connection()->send_chain(first, last);
+            if (request->get_connection()->is_error()) {
                 Logger::instance()->info("connection error");
                 return SERVX_ERROR;
             }
 
             sent = 1;
             std::for_each(first, iter,
-                [this](Buffer* buf) { server->ret_body_buf(buf); });
+                [this](Buffer* buf)
+                { request->get_server()->ret_buffer(buf); });
             chain.erase(first, iter);
 
             if (iter != last) {
@@ -207,10 +194,10 @@ int HttpResponse::send() {
         auto &files = out.front().files;
 
         if (!files.empty()) {
-            if (location->is_send_file()) {
+            if (request->get_location()->is_send_file()) {
                 auto iter = files.begin();
                 while (!files.empty()) {
-                    rc = conn->send_file(iter->get());
+                    rc = request->get_connection()->send_file(iter->get());
                     if (rc == SERVX_ERROR) {
                         return SERVX_ERROR;
                     }
@@ -220,10 +207,9 @@ int HttpResponse::send() {
                     iter = files.erase(iter);
                 }
             } else {
-                chain.emplace_back(server->get_body_buf());
+                chain.emplace_back(request->get_server()->get_buffer());
                 auto iter = files.begin();
                 while (!files.empty()) {
-                    // TODO: read partical && write
                     if (!(*iter)->file_status()) {
                         return SERVX_ERROR;
                     }
@@ -247,7 +233,7 @@ int HttpResponse::send() {
                         iter = files.erase(iter);
                         continue;
                     } else if (chain.back()->get_remain() == 0) {
-                        chain.emplace_back(server->get_body_buf());
+                        chain.emplace_back(request->get_server()->get_buffer());
                         continue;
                     } else {
                         break;
@@ -263,6 +249,14 @@ int HttpResponse::send() {
     Logger::instance()->debug("send response success!");
 
     return SERVX_OK;
+}
+
+void HttpResponse::send_response_handler(HttpRequest* r) {
+    int rc = r->get_response()->send();
+
+    if (rc == SERVX_ERROR) {
+        r->close(SERVX_ERROR);
+    }
 }
 
 }

@@ -13,8 +13,7 @@ namespace servx {
 struct HttpCoreSrvConf: public ModuleConf {
     int client_header_timeout;
     int client_body_timeout;
-    int client_header_buffer_size;
-    int client_body_buffer_size;
+    int client_buffer_size;
 };
 
 class Server {
@@ -36,8 +35,8 @@ public:
 
     Location* find_location(const std::string& uri);
 
-    Buffer* get_body_buf();
-    void ret_body_buf(Buffer* buf);
+    Buffer* get_buffer();
+    void ret_buffer(Buffer* buf);
 
     template <typename T>
     typename T::srv_conf_t* get_conf();
@@ -48,8 +47,8 @@ private:
     std::unordered_set<std::string> server_names;
     std::vector<std::unique_ptr<Location>> regex_locations;
     LocationTree prefix_locations;
-    std::vector<std::unique_ptr<Buffer>> all_bufs;
-    std::vector<Buffer*> free_body_bufs;
+    std::list<Buffer> all_bufs;
+    std::list<Buffer*> free_bufs;
     std::unique_ptr<ModuleConf> confs[NULL_MODULE];
 };
 

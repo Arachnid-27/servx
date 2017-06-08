@@ -35,7 +35,7 @@ Server* HttpListening::search_server(const std::string& name) {
     if (iter != servers.end()) {
         return *iter;
     }
-    return default_server;
+    return get_default_server();
 }
 
 void HttpListening::init_connection(Connection* conn) {

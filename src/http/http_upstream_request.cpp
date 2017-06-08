@@ -10,16 +10,16 @@ namespace servx {
 
 HttpUpstreamRequest::~HttpUpstreamRequest() {
     if (request_header_buf) {
-        server->ret_body_buf(request_header_buf);
+        server->ret_buffer(request_header_buf);
     }
     if (response_header_buf) {
-        server->ret_body_buf(response_header_buf);
+        server->ret_buffer(response_header_buf);
     }
     for (Buffer *buf : request_body_bufs) {
-        server->ret_body_buf(buf);
+        server->ret_buffer(buf);
     }
     for (Buffer *buf : response_body_bufs) {
-        server->ret_body_buf(buf);
+        server->ret_buffer(buf);
     }
 }
 
@@ -61,12 +61,16 @@ int HttpUpstreamRequest::connect() {
         return SERVX_AGAIN;
     }
 
-    build_request();
+    if (build_request() == SERVX_ERROR) {
+        conn->close();
+        return SERVX_ERROR;
+    }
+
     rc = send_request();
 
     switch (rc) {
     case SERVX_ERROR:
-        Logger::instance()->error("send request error");
+        Logger::instance()->warn("send request error");
         conn->close();
         return SERVX_ERROR;
     case SERVX_AGAIN:
@@ -87,13 +91,15 @@ void HttpUpstreamRequest::wait_connect_handler(Event* ev) {
 
     Logger::instance()->debug("connect upstream success");
 
-    build_request();
+    if (build_request() == SERVX_ERROR) {
+        close(HTTP_INTERNAL_SERVER_ERROR);
+        return;
+    }
+
     int rc = send_request();
-
-    Logger::instance()->debug("send_request return, get %d", rc);
-
     switch (rc) {
     case SERVX_ERROR:
+        Logger::instance()->warn("send request error");
         close(HTTP_INTERNAL_SERVER_ERROR);
         break;
     case SERVX_AGAIN:
@@ -123,7 +129,7 @@ void HttpUpstreamRequest::recv_response_line_handler(Event* ev) {
 
     if (response_header_buf == nullptr) {
         Logger::instance()->debug("init request header buf");
-        response_header_buf = server->get_body_buf();
+        response_header_buf = server->get_buffer();
         header = std::unique_ptr<HttpResponseHeader>(
             new HttpResponseHeader(response_header_buf));
     }
@@ -200,16 +206,18 @@ void HttpUpstreamRequest::response_header_done(Event* ev) {
         }
     }
 
+    int rc;
+
     Logger::instance()->debug("content-length = %d", content_length);
 
     if (content_length == 0 || content_length == -1) {
         response_header_buf->set_last(response_header_buf->get_pos());
         response_header_buf->set_pos(response_header_buf->get_start());
-        response_header_handler(request, response_header_buf);
+        rc = response_header_handler(request, response_header_buf);
 
-        close(SERVX_OK);
+        close(rc);
     } else {
-        Buffer *buf = server->get_body_buf();
+        Buffer *buf = server->get_buffer();
         int size = response_header_buf->get_size();
         if (size > 0) {
             memmove(buf->get_pos(), response_header_buf->get_pos(), size);
@@ -219,7 +227,7 @@ void HttpUpstreamRequest::response_header_done(Event* ev) {
 
         response_header_buf->set_last(response_header_buf->get_pos());
         response_header_buf->set_pos(response_header_buf->get_start());
-        response_header_handler(request, response_header_buf);
+        rc = response_header_handler(request, response_header_buf);
 
         conn->get_read_event()->set_handler([this](Event* ev) {
                 this->recv_response_body_handler(ev);
@@ -241,7 +249,7 @@ int HttpUpstreamRequest::handle_response_body() {
     int rc = response_body_handler(request, buf);
 
     if (rc == SERVX_ERROR) {
-        Logger::instance()->info("response_body_handler error");
+        Logger::instance()->warn("response_body_handler error");
         close(rc);
         return SERVX_ERROR;
     }
@@ -249,10 +257,6 @@ int HttpUpstreamRequest::handle_response_body() {
     if (recv == content_length) {
         close(SERVX_OK);
         return SERVX_OK;
-    }
-
-    if (rc == SERVX_OK) {
-        // TODO: discard
     }
 
     return SERVX_AGAIN;
@@ -273,8 +277,10 @@ void HttpUpstreamRequest::recv_response_body_handler(Event* ev) {
         n = conn->recv_data(buf, size);
 
         if (n < 0) {
-            Logger::instance()->error("get data from upstream error");
-            close(HTTP_INTERNAL_SERVER_ERROR);
+            if (n != SERVX_AGAIN) {
+                Logger::instance()->warn("get data from upstream error");
+                close(HTTP_INTERNAL_SERVER_ERROR);
+            }
             return;
         }
 
@@ -292,19 +298,17 @@ void HttpUpstreamRequest::recv_response_body_handler(Event* ev) {
             return;
         }
 
-        // TODO: maybe discard
-
         if (n != size) {
             return;
         }
-        response_body_bufs.emplace_back(server->get_body_buf());
+        response_body_bufs.emplace_back(server->get_buffer());
     }
 }
 
-void HttpUpstreamRequest::build_request() {
+int HttpUpstreamRequest::build_request() {
     // copy it
     request_body_bufs = request->get_request_body()->get_body_buffer();
-    request_header_buf = server->get_body_buf();
+    request_header_buf = server->get_buffer();
 
     int n;
     char *pos = request_header_buf->get_pos();
@@ -329,13 +333,12 @@ void HttpUpstreamRequest::build_request() {
         if (hb->first != "host" && hb->first != "connection") {
             n = snprintf(pos, request_header_buf->get_remain(), "%s:%s\r\n",
                          hb->first.c_str(), hb->second.c_str());
-            if (request_header_buf->get_remain() < 2) {
-                // TODO: error handler
-                Logger::instance()->info("header too large");
-                break;
-            }
             pos += n;
             request_header_buf->set_last(pos);
+            if (request_header_buf->get_remain() < 2) {
+                Logger::instance()->warn("request header too large");
+                return SERVX_ERROR;
+            }
         }
         ++hb;
     }
@@ -345,6 +348,7 @@ void HttpUpstreamRequest::build_request() {
     request_header_buf->set_last(pos + 2);
 
     Logger::instance()->debug("build request success");
+    return SERVX_OK;
 }
 
 int HttpUpstreamRequest::read_response_header() {
@@ -376,6 +380,7 @@ int HttpUpstreamRequest::send_request() {
         int n = conn->send_data(request_header_buf, size);
 
         if (conn->is_error()) {
+            Logger::instance()->warn("send data error");
             return SERVX_ERROR;
         }
 

@@ -1,6 +1,7 @@
 #ifndef _HTTP_UPSTREAM_SERVER_H_
 #define _HTTP_UPSTREAM_SERVER_H_
 
+#include <list>
 #include <memory>
 
 #include "buffer.h"
@@ -22,13 +23,13 @@ public:
 
     TcpConnectSocket& get_socket() const { return *socket; }
 
-    Buffer* get_body_buf();
-    void ret_body_buf(Buffer* buf);
+    Buffer* get_buffer();
+    void ret_buffer(Buffer* buf);
 
 private:
     std::unique_ptr<TcpConnectSocket> socket;
-    std::vector<std::unique_ptr<Buffer>> all_bufs;
-    std::vector<Buffer*> free_body_bufs;
+    std::list<Buffer> all_bufs;
+    std::vector<Buffer*> free_bufs;
 };
 
 }

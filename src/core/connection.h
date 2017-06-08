@@ -182,7 +182,7 @@ Iter Connection::send_chain(Iter first, Iter last) {
         }
 
         write_event.set_ready(false);
-        return cur;
+        return first;
     }
 
     return last;

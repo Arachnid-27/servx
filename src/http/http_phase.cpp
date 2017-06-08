@@ -1,6 +1,7 @@
 #include "http_phase.h"
 
 #include "core.h"
+#include "event_module.h"
 #include "http_request.h"
 #include "logger.h"
 
@@ -72,18 +73,30 @@ int HttpPhaseRunner::generic_phase_checker(HttpRequest* req) {
 }
 
 int HttpPhaseRunner::content_phase_checker(HttpRequest* req) {
-    auto &vec = phase_handlers[req->get_phase()];
+    int rc;
     auto handler = req->get_location()->get_content_handler();
-    if (handler == nullptr) {
-        handler = vec[req->get_phase_index()];
+    if (handler != nullptr) {
+        rc = handler(req);
+        if (rc != SERVX_AGAIN) {
+            req->finalize(rc);
+        }
+        // TODO: SERVX_AGAIN
+        return SERVX_OK;
     }
 
-    int rc =  handler(req);
+    auto &vec = phase_handlers[req->get_phase()];
+    handler = vec[req->get_phase_index()];
+    rc = handler(req);
 
     Logger::instance()->debug("content phase checker get %d", rc);
 
     if (rc == SERVX_AGAIN) {
-        // set http_write
+        Event *ev = req->get_connection()->get_write_event();
+        req->set_write_handler(HttpResponse::send_response_handler);
+        if (!ev->is_active() && !add_event(ev, 0)) {
+            Logger::instance()->warn("add write event error");
+            req->finalize(HTTP_INTERNAL_SERVER_ERROR);
+        }
         return SERVX_OK;
     }
 
@@ -124,7 +137,6 @@ int HttpPhaseRunner::find_config_handler(HttpRequest* req) {
     }
 
     req->set_location(loc);
-    req->get_response()->set_location(loc);
 
     return SERVX_OK;
 }

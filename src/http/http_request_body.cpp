@@ -11,7 +11,7 @@ namespace servx {
 HttpRequestBody::~HttpRequestBody() {
     // we can ensure 'req' is not freed here normally
     for (Buffer *buf : body_buffer) {
-        req->get_server()->ret_body_buf(buf);
+        req->get_server()->ret_buffer(buf);
     }
 }
 
@@ -22,7 +22,7 @@ int HttpRequestBody::read(const http_req_handler_t& h) {
     }
 
     handler = h;
-    body_buffer.emplace_back(req->get_server()->get_body_buf());
+    body_buffer.emplace_back(req->get_server()->get_buffer());
 
     Buffer *pre_buf = req->get_connection()->get_recv_buf();
     int pre = pre_buf->get_size();
@@ -83,7 +83,7 @@ int HttpRequestBody::handle_read() {
             req->set_read_handler(http_block_reading);
             return handler(req);
         } else if (buf->get_remain() == 0) {
-            body_buffer.emplace_back(req->get_server()->get_body_buf());
+            body_buffer.emplace_back(req->get_server()->get_buffer());
         } else {
             return SERVX_AGAIN;
         }
@@ -115,7 +115,7 @@ int HttpRequestBody::discard() {
         return SERVX_OK;
     }
 
-    body_buffer.emplace_back(req->get_server()->get_body_buf());
+    body_buffer.emplace_back(req->get_server()->get_buffer());
     int rc = handle_discard();
 
     if (rc == SERVX_ERROR) {
@@ -148,7 +148,7 @@ int HttpRequestBody::handle_discard() {
         recv += rc;
         if (recv == content_length) {
             req->set_read_handler(http_block_reading);
-            req->get_server()->ret_body_buf(buf);
+            req->get_server()->ret_buffer(buf);
             body_buffer.pop_back();
             discarded = 1;
             return SERVX_OK;

@@ -20,8 +20,7 @@ int HttpCoreModule::server_handler(command_vals_t v) {
     auto cf = srv->get_core_conf();
     cf->client_header_timeout = 60000;
     cf->client_body_timeout = 60000;
-    cf->client_header_buffer_size = 4096;
-    cf->client_body_buffer_size = 4096;
+    cf->client_buffer_size = 4096;
     return SERVER_BLOCK;
 }
 

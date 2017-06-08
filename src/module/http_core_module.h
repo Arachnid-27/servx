@@ -44,12 +44,8 @@ public:
                         "client_body_tiemout",
                         lambda_handler(client_body_timeout_handler), 1),
             new Command(SERVER_BLOCK,
-                        "client_header_buffer_size",
-                        lambda_handler(client_header_buffer_size_handler),
-                        1),
-            new Command(SERVER_BLOCK,
-                        "client_body_buffer_size",
-                        lambda_handler(client_body_buffer_size_handler),
+                        "client_buffer_size",
+                        lambda_handler(client_buffer_size_handler),
                         1),
             new Command(ADDRESS_BLOCK,
                         "addr",
@@ -96,15 +92,9 @@ public:
             srv->get_core_conf(), v[0]);
     }
 
-    int client_header_buffer_size_handler(command_vals_t v) {
+    int client_buffer_size_handler(command_vals_t v) {
         return set_conf_int<srv_conf_t,
-            &srv_conf_t::client_header_buffer_size>(
-            srv->get_core_conf(), v[0]);
-    }
-
-    int client_body_buffer_size_handler(command_vals_t v) {
-        return set_conf_int<srv_conf_t,
-            &srv_conf_t::client_body_buffer_size>(
+            &srv_conf_t::client_buffer_size>(
             srv->get_core_conf(), v[0]);
     }
 

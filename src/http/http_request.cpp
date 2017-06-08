@@ -14,7 +14,7 @@ namespace servx {
 
 HttpRequest::HttpRequest(Connection* c)
     : conn(c), http_method(HTTP_METHOD_UNKONWN),
-      header(c->get_recv_buf()), body(this), response(c),
+      header(c->get_recv_buf()), body(this), response(this),
       phase(HTTP_POST_READ_PHASE), phase_index(0),
       server(nullptr), location(nullptr),
       keep_alive(false) {
@@ -95,7 +95,6 @@ void HttpRequest::process_headers(Event* ev) {
         } else {
             HttpConnection *hc = conn->get_context<HttpConnection>();
             server = hc->get_listening()->search_server(host);
-            response.set_server(server);
             if (server == hc->get_listening()->get_default_server()) {
                 Logger::instance()->debug("use default server");
             }
@@ -230,6 +229,10 @@ void HttpRequest::finalize(int rc) {
     }
 
     if (rc == SERVX_ERROR) {
+        if (response.is_sent()) {
+            conn->close();
+            return;
+        }
         rc = HTTP_INTERNAL_SERVER_ERROR;
     }
 
@@ -237,13 +240,7 @@ void HttpRequest::finalize(int rc) {
 }
 
 void HttpRequest::close(int status) {
-    if ((conn->is_error() ||
-        conn->is_timeout()) && response.is_sent()) {
-        conn->close();
-        return;
-    }
-
-    if (status != SERVX_OK) {
+    if (!response.is_sent() && status != SERVX_OK) {
         response.set_content_length(0);
         response.set_status(status);
         // TODO: maybe again
