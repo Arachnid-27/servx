@@ -55,7 +55,7 @@ void HttpListening::init_connection(Connection* conn) {
     conn->set_context(hc);
 
     rev->set_handler([hc](Event* ev) { hc->wait_request(ev); });
-    wev->set_handler(empty_write_handler);
+    wev->set_handler(Event::empty_write_handler);
 
     if (rev->is_ready()) { // deferred_accept
         rev->handle();

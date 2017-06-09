@@ -80,7 +80,6 @@ int HttpPhaseRunner::content_phase_checker(HttpRequest* req) {
         if (rc != SERVX_AGAIN) {
             req->finalize(rc);
         }
-        // TODO: SERVX_AGAIN
         return SERVX_OK;
     }
 
@@ -91,10 +90,10 @@ int HttpPhaseRunner::content_phase_checker(HttpRequest* req) {
     Logger::instance()->debug("content phase checker get %d", rc);
 
     if (rc == SERVX_AGAIN) {
-        Event *ev = req->get_connection()->get_write_event();
+        // TODO: timeout
         req->set_write_handler(HttpResponse::send_response_handler);
-        if (!ev->is_active() && !add_event(ev, 0)) {
-            Logger::instance()->warn("add write event error");
+        if (!add_event(req->get_connection()->get_write_event(), 0)) {
+            Logger::instance()->warn("add write event failed");
             req->finalize(HTTP_INTERNAL_SERVER_ERROR);
         }
         return SERVX_OK;

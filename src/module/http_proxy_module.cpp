@@ -58,7 +58,20 @@ int HttpProxyModule::proxy_pass_request_handler(HttpRequest* req) {
 
 int HttpProxyModule::proxy_pass_response_header_handler(
     HttpRequest* req, Buffer* buf) {
-    // TODO: sometime we should buffer it
+    auto ctx = req->get_context<HttpProxyModule>();
+    auto resp = ctx->hur->get_response_header();
+    auto &location = resp->get_header("location");
+    if (!location.empty()) {
+        // 302
+        auto &host = req->get_request_header()->get_header("host");
+        auto first = location.begin() + 7;
+        auto last = std::find(first, location.end(), '/');
+        location.replace(first, last, host.c_str());
+        // avoid refill buffer
+        buf->reset();
+        resp->fill_response_header(buf);
+    }
+
     int size = buf->get_size();
     int rc = req->get_connection()->send_data(buf, size);
 
@@ -84,6 +97,7 @@ int HttpProxyModule::proxy_pass_response_header_handler(
 
 int HttpProxyModule::proxy_pass_response_body_handler(
     HttpRequest* req, Buffer* buf) {
+    // TODO: sometime we should buffer it
     auto ctx = req->get_context<HttpProxyModule>();
     if (!ctx->out.empty()) {
         ctx->out.push_back(buf);
@@ -113,11 +127,12 @@ int HttpProxyModule::proxy_pass_response_body_handler(
 }
 
 void HttpProxyModule::proxy_pass_finalize_handler(HttpRequest* req, int rc) {
+    Logger::instance()->debug("proxy_pass finalize, rc = %d", rc);
     auto ctx = req->get_context<HttpProxyModule>();
     if (rc == SERVX_OK && !ctx->out.empty()) {
         return;
     }
-    req->close(rc);
+    req->finalize(rc);
 }
 
 void HttpProxyModule::proxy_pass_write_handler(HttpRequest* req) {

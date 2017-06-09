@@ -241,10 +241,18 @@ void HttpRequest::finalize(int rc) {
 
 void HttpRequest::close(int status) {
     if (!response.is_sent() && status != SERVX_OK) {
+        Logger::instance()->debug("send response, status = %d", status);
         response.set_content_length(0);
         response.set_status(status);
-        // TODO: maybe again
-        response.send_header();
+        if (response.send_header() == SERVX_AGAIN) {
+            set_write_handler(HttpResponse::send_response_handler);
+            Timer::instance()->add_timer(conn->get_write_event(), 60000);
+            if (!add_event(conn->get_write_event(), 0)) {
+                Logger::instance()->warn("add event failed");
+            }
+            // TODO: maybe reuse
+            return;
+        }
     }
 
     if (status == HTTP_REQUEST_TIME_OUT ||
@@ -266,13 +274,16 @@ void HttpRequest::close(int status) {
         conn->get_read_event()->set_handler([hc](Event* ev)
             { hc->wait_request(ev); });
         conn->get_write_event()->set_ready(false);
-        conn->get_write_event()->set_handler(empty_write_handler);
+        conn->get_write_event()->set_handler(Event::empty_write_handler);
+
+        if (!del_event(conn->get_write_event(), 0)) {
+            Logger::instance()->warn("del event failed");
+            return;
+        }
+        ConnectionPool::instance()->enable_reusable(conn);
+
         hc->close_request();
     }
 }
-
-void http_block_reading(HttpRequest* req) {}
-
-void http_block_writing(HttpRequest* req) {}
 
 }

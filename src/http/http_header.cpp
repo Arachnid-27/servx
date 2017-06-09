@@ -1,5 +1,7 @@
 #include "http_header.h"
 
+#include <cstring>
+
 #include "http_request.h"
 #include "logger.h"
 
@@ -173,6 +175,24 @@ int HttpHeader::parse_headers() {
 
     buffer->set_pos(start);
     return SERVX_AGAIN;
+}
+
+bool HttpHeader::fill_headers(Buffer* buf) {
+    for (auto &s : headers) {
+        int n = snprintf(buf->get_last(), buf->get_remain(), "%s:%s\r\n",
+            s.first.c_str(), s.second.c_str());
+        buf->move_last(n);
+        if (buf->get_remain() < 2) {
+            Logger::instance()->warn("response header too large");
+            return false;
+        }
+    }
+
+    buf->get_last()[0] = '\r';
+    buf->get_last()[1] = '\n';
+    buf->move_last(2);
+
+    return true;
 }
 
 int HttpRequestHeader::parse_request_line() {
@@ -735,6 +755,16 @@ int HttpResponseHeader::parse_response_line() {
 
     buffer->set_pos(start);
     return SERVX_AGAIN;
+}
+
+bool HttpResponseHeader::fill_response_header(Buffer* buf) {
+    int n = snprintf(buf->get_pos(), buf->get_remain(),
+        "HTTP/%s %s %s\r\n",
+        version.c_str(),
+        status.c_str(),
+        description.c_str());
+    buf->move_last(n);
+    return fill_headers(buf);
 }
 
 }

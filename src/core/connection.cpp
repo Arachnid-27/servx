@@ -11,30 +11,6 @@
 
 namespace servx {
 
-Event::Event(Connection* c, bool w)
-    : conn(c), write(w) {
-    reset();
-}
-
-void Event::expire() {
-    timer = 0;
-    timeout = 1;
-    handler(this);
-    timeout = 0;
-}
-
-void Event::reset() {
-    active = 0;
-    ready = 0;
-    timeout = 0;
-    timer = 0;
-    eof = 0;
-}
-
-void empty_read_handler(Event*) {}
-
-void empty_write_handler(Event*) {}
-
 uint64_t Connection::count = 0;
 
 Connection::Connection()

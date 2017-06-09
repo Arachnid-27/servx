@@ -73,6 +73,10 @@ public:
     void finalize(int rc);
     void close(int status);
 
+    static void http_block_reading(HttpRequest* req) {}
+
+    static void http_block_writing(HttpRequest* req) {}
+
 private:
     Connection *conn;
     http_req_handler_t read_handler;
@@ -94,9 +98,6 @@ private:
 
     bool keep_alive;
 };
-
-void http_block_reading(HttpRequest* req);
-void http_block_writing(HttpRequest* req);
 
 }
 

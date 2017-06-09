@@ -43,8 +43,8 @@ std::string HttpResponse::status_lines[] = {
 HttpResponse::HttpResponse(HttpRequest* r)
     : request(r), content_length(-1),
       last_modified_time(-1), status(-1),
-      header_only(false), chunked(false),
-      keep_alive(false), etag(false) {
+      header_only(0), chunked(0),
+      keep_alive(0), etag(0), sent(0) {
 }
 
 HttpResponse::~HttpResponse() {
@@ -252,6 +252,7 @@ int HttpResponse::send() {
 }
 
 void HttpResponse::send_response_handler(HttpRequest* r) {
+    // TODO: timeout
     int rc = r->get_response()->send();
 
     if (rc == SERVX_ERROR) {

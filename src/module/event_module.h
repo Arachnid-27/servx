@@ -76,11 +76,17 @@ public:
 };
 
 inline bool add_event(Event* ev, int flags) {
+    if (ev->is_active()) {
+        return true;
+    }
     return ModuleManager::instance()->get_conf<MainEventModule>()
         ->module->add_event(ev, flags);
 }
 
 inline bool del_event(Event* ev, int flags) {
+    if (!ev->is_active()) {
+        return true;
+    }
     return ModuleManager::instance()->get_conf<MainEventModule>()
         ->module->del_event(ev, flags);
 }

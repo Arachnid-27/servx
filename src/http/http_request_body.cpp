@@ -39,7 +39,7 @@ int HttpRequestBody::read(const http_req_handler_t& h) {
     }
 
     if (recv == content_length) {
-        req->set_read_handler(http_block_reading);
+        req->set_read_handler(HttpRequest::http_block_reading);
         return handler(req);
     }
 
@@ -80,7 +80,7 @@ int HttpRequestBody::handle_read() {
             if (conn->get_read_event()->is_timer()) {
                 Timer::instance()->del_timer(conn->get_read_event());
             }
-            req->set_read_handler(http_block_reading);
+            req->set_read_handler(HttpRequest::http_block_reading);
             return handler(req);
         } else if (buf->get_remain() == 0) {
             body_buffer.emplace_back(req->get_server()->get_buffer());
@@ -111,7 +111,7 @@ int HttpRequestBody::discard() {
     }
 
     if (recv == content_length) {
-        req->set_read_handler(http_block_reading);
+        req->set_read_handler(HttpRequest::http_block_reading);
         return SERVX_OK;
     }
 
@@ -147,7 +147,7 @@ int HttpRequestBody::handle_discard() {
 
         recv += rc;
         if (recv == content_length) {
-            req->set_read_handler(http_block_reading);
+            req->set_read_handler(HttpRequest::http_block_reading);
             req->get_server()->ret_buffer(buf);
             body_buffer.pop_back();
             discarded = 1;

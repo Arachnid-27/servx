@@ -45,7 +45,7 @@ int HttpUpstreamRequest::connect() {
         ->get_connection(socket.get_fd(), false);
     socket.release();
 
-    if (conn == nullptr || !add_connection(conn)) {
+    if (conn == nullptr || !add_event(conn->get_write_event(), 0)) {
         Logger::instance()->warn("add connection error");
         conn->close();
         return SERVX_ERROR;
@@ -53,7 +53,7 @@ int HttpUpstreamRequest::connect() {
 
     if (rc == SERVX_AGAIN) {
         Logger::instance()->debug("connect again");
-        conn->get_read_event()->set_handler(empty_read_handler);
+        conn->get_read_event()->set_handler(Event::empty_read_handler);
         conn->get_write_event()->set_handler([this](Event* ev) {
                 this->wait_connect_handler(ev);
             });
@@ -74,7 +74,7 @@ int HttpUpstreamRequest::connect() {
         conn->close();
         return SERVX_ERROR;
     case SERVX_AGAIN:
-        conn->get_read_event()->set_handler(empty_read_handler);
+        conn->get_read_event()->set_handler(Event::empty_read_handler);
         conn->get_write_event()->set_handler([this](Event* ev) {
                 this->send_request_handler(ev);
             });
@@ -103,7 +103,7 @@ void HttpUpstreamRequest::wait_connect_handler(Event* ev) {
         close(HTTP_INTERNAL_SERVER_ERROR);
         break;
     case SERVX_AGAIN:
-        conn->get_read_event()->set_handler(empty_read_handler);
+        conn->get_read_event()->set_handler(Event::empty_read_handler);
         conn->get_write_event()->set_handler([this](Event* ev) {
                 this->send_request_handler(ev);
             });
@@ -412,7 +412,14 @@ int HttpUpstreamRequest::send_request() {
     conn->get_read_event()->set_handler([this](Event* ev) {
             this->recv_response_line_handler(ev);
         });
-    conn->get_write_event()->set_handler(empty_write_handler);
+    conn->get_write_event()->set_handler(Event::empty_write_handler);
+
+    if (!add_event(conn->get_read_event(), 0) ||
+        !del_event(conn->get_write_event(), 0)) {
+        Logger::instance()->warn(
+            "add read event, or del write event failed");
+        return SERVX_ERROR;
+    }
 
     return SERVX_OK;
 }

@@ -22,13 +22,20 @@ public:
 
     int parse_headers();
 
-    const std::string& get_header(const std::string key) const {
+    std::string& get_header(const std::string& key) {
         auto iter = headers.find(key);
         return iter == headers.end() ? temp : iter->second;
     }
 
     const std::unordered_map<std::string, std::string>&
     get_headers() const { return headers; }
+
+    template <typename T>
+    void set_header(const std::string& key, T&& value) {
+        headers[key] = std::forward<T>(value);
+    }
+
+    bool fill_headers(Buffer* buffer);
 
 protected:
     enum HttpParseState {
@@ -140,6 +147,8 @@ public:
     ~HttpResponseHeader() = default;
 
     int parse_response_line();
+
+    bool fill_response_header(Buffer* buf);
 
 private:
     std::string version;
