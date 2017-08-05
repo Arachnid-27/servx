@@ -3,32 +3,39 @@
 
 namespace servx {
 
-std::unique_ptr<HttpUpstream> HttpUpstreamModule::upstream = nullptr;
+HttpUpstreamConf HttpUpstreamModule::conf;
+HttpUpstreamModule HttpUpstreamModule::instance;
+std::vector<Command*> HttpUpstreamModule::commands = {
+    new command::Upstream,
+    new command::UpServer
+};
 
-int HttpUpstreamModule::upstream_handler(command_vals_t v) {
+namespace command {
+
+bool Upstream::execute(const command_args_t& v) {
     if (v[0].empty()) {
-        return SERVX_ERROR;
-    }
-    upstream = std::unique_ptr<HttpUpstream>(new HttpUpstream(v[0]));
-    return UPSTREAM_BLOCK;
-}
-
-int HttpUpstreamModule::server_handler(command_vals_t v) {
-    if (!upstream->push_server(v[0], v[1])) {
-        return SERVX_ERROR;
-    }
-    return NULL_BLOCK;
-}
-
-bool HttpUpstreamModule::upstream_post_handler() {
-    if (upstream->empty()) {
-        Logger::instance()->error("upstream %s is empty",
-            upstream->get_name().c_str());
         return false;
     }
-    conf->upstreams.emplace(upstream->get_name(), std::move(upstream));
-    upstream = nullptr;
+    HttpUpstreamModule::conf.temp_upstream.reset(new HttpUpstream(v[0]));
     return true;
+}
+
+bool Upstream::post_execute() {
+    auto &us = HttpUpstreamModule::conf.temp_upstream;
+    if (us->empty()) {
+        Logger::instance()->error("upstream %s is empty",
+            HttpUpstreamModule::conf.temp_upstream->get_name().c_str());
+        return false;
+    }
+    HttpUpstreamModule::conf.upstreams.emplace(us->get_name(), std::move(us));
+    us = nullptr;
+    return true;
+}
+
+bool UpServer::execute(const command_args_t& v) {
+    return HttpUpstreamModule::conf.temp_upstream->push_server(v[0], v[1]);
+}
+
 }
 
 }

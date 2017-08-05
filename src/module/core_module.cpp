@@ -3,43 +3,47 @@
 #include <sys/resource.h>
 
 #include "logger.h"
-#include "module_manager.h"
 
 namespace servx {
 
+MainCoreConf MainCoreModule::conf;
+MainCoreModule MainCoreModule::instance;
+std::vector<Command*> MainCoreModule::commands = {
+    new command::Worker,
+    new command::Daemon,
+    new command::RlimitNofile,
+    new command::ErrorLog
+};
+
 bool MainCoreModule::init_conf() {
-    conf->worker = 1;
-    conf->daemon = true;
-    conf->rlimit_nofile = -1;
+    conf.worker = 1;
+    conf.daemon = true;
+    conf.rlimit_nofile = -1;
     return true;
 }
 
 bool MainCoreModule::init_module() {
-    if (conf->rlimit_nofile > 0) {
+    if (conf.rlimit_nofile > 0) {
         rlimit rlmt;
-        rlmt.rlim_cur = conf->rlimit_nofile;
-        rlmt.rlim_max = conf->rlimit_nofile;
+        rlmt.rlim_cur = conf.rlimit_nofile;
+        rlmt.rlim_max = conf.rlimit_nofile;
 
         if (setrlimit(RLIMIT_NOFILE, &rlmt) == -1) {
             Logger::instance()->warn("setrlimit() failed, ignore");
         }
     }
-
     return true;
 }
 
-int MainCoreModule::daemon_handler(command_vals_t v) {
-    conf->daemon = v[0] == "on";
+namespace command {
 
-    return NULL_BLOCK;
-}
-
-int MainCoreModule::error_log_handler(command_vals_t v) {
+bool ErrorLog::execute(const command_args_t& v) {
     for (auto &s : v) {
         Logger::instance()->push_file(s);
     }
+    return true;
+}
 
-    return NULL_BLOCK;
 }
 
 }

@@ -4,17 +4,11 @@
 #include <unordered_set>
 #include <vector>
 
+#include "http_location_tree.h"
 #include "listener.h"
-#include "location.h"
 #include "module.h"
 
 namespace servx {
-
-struct HttpCoreSrvConf: public ModuleConf {
-    int client_header_timeout;
-    int client_body_timeout;
-    int client_buffer_size;
-};
 
 class Server {
 public:
@@ -38,18 +32,24 @@ public:
     Buffer* get_buffer();
     void ret_buffer(Buffer* buf);
 
+    int get_timeout() const { return timeout; }
+    void set_timeout(int t) { timeout = t; }
+
+    void set_buffer_size(int sz) { buffer_size = sz; }
+
     template <typename T>
     typename T::srv_conf_t* get_conf();
 
-    HttpCoreSrvConf* get_core_conf();
-
 private:
+    int timeout;
+    int buffer_size;
+
     std::unordered_set<std::string> server_names;
     std::vector<std::unique_ptr<Location>> regex_locations;
     LocationTree prefix_locations;
     std::list<Buffer> all_bufs;
     std::list<Buffer*> free_bufs;
-    std::unique_ptr<ModuleConf> confs[NULL_MODULE];
+    std::unordered_map<uintptr_t, std::unique_ptr<HttpConf>> confs;
 };
 
 inline bool Server::contain_server_name(const std::string& name) const {
@@ -58,11 +58,8 @@ inline bool Server::contain_server_name(const std::string& name) const {
 
 template <typename T>
 inline typename T::srv_conf_t* Server::get_conf() {
-    return static_cast<typename T::srv_conf_t*>(confs[T::index].get());
-}
-
-inline HttpCoreSrvConf* Server::get_core_conf() {
-    return static_cast<HttpCoreSrvConf*>(confs[HTTP_CORE_MODULE].get());
+    return static_cast<typename T::srv_conf_t*>(
+        confs[*reinterpret_cast<uintptr_t*>(&T::instance)].get());
 }
 
 }

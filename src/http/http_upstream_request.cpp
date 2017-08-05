@@ -45,7 +45,7 @@ int HttpUpstreamRequest::connect() {
         ->get_connection(socket.get_fd(), false);
     socket.release();
 
-    if (conn == nullptr || !add_event(conn->get_write_event(), 0)) {
+    if (conn == nullptr || !add_event(conn->get_write_event())) {
         Logger::instance()->warn("add connection error");
         conn->close();
         return SERVX_ERROR;
@@ -414,8 +414,8 @@ int HttpUpstreamRequest::send_request() {
         });
     conn->get_write_event()->set_handler(Event::empty_write_handler);
 
-    if (!add_event(conn->get_read_event(), 0) ||
-        !del_event(conn->get_write_event(), 0)) {
+    if (!add_event(conn->get_read_event()) ||
+        !del_event(conn->get_write_event())) {
         Logger::instance()->warn(
             "add read event, or del write event failed");
         return SERVX_ERROR;

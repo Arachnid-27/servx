@@ -54,7 +54,7 @@ int HttpRequestBody::handle_read() {
     if (!conn->get_read_event()->is_timer()) {
         // TODO: del timer
         Timer::instance()->add_timer(conn->get_read_event(),
-            req->get_server()->get_core_conf()->client_body_timeout);
+            req->get_server()->get_timeout());
     }
 
     while (true) {

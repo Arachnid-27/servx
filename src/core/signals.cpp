@@ -6,8 +6,6 @@
 
 namespace servx {
 
-bool sig_timer_alarm = false;
-
 bool signal(int signum, void (*handler)(int)) {
     struct sigaction sa;
 

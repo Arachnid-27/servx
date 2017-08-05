@@ -5,8 +5,6 @@
 
 namespace servx {
 
-extern bool sig_timer_alarm;
-
 bool signal(int signum, void (*handler)(int));
 
 bool set_timer(int value);

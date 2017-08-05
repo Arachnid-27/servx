@@ -19,7 +19,7 @@ bool ConfParser::parse() {
     }
 
     for (auto &c : root->get_items()) {
-        if (!process(c, CORE_BLOCK)) {
+        if (!process(c, "core")) {
             return false;
         }
     }
@@ -27,23 +27,23 @@ bool ConfParser::parse() {
     return true;
 }
 
-bool ConfParser::process(const ConfItem& item, int block) {
+bool ConfParser::process(const ConfItem& item, const std::string& block) {
     auto cmd = ModuleManager::instance()
         ->find_command(block, item.get_name());
 
     if (cmd == nullptr) {
-        Logger::instance()->error("can not find command %s in block %d",
-            item.get_name().c_str(), block);
+        Logger::instance()->error("can not find command %s in block %s",
+            item.get_name().c_str(), block.c_str());
         return false;
     }
 
-    if (cmd->get_block_context() != block) {
+    if (cmd->get_parent_name() != block) {
         Logger::instance()->error("block context error for %s",
             item.get_name().c_str());
         return false;
     }
 
-    auto c = cmd->args_count();
+    auto c = cmd->get_args();
     auto v = item.get_values();
 
     if (c >= 0 && static_cast<size_t>(c) != v.size()) {
@@ -59,17 +59,16 @@ bool ConfParser::process(const ConfItem& item, int block) {
         return false;
     }
 
-    if (rc != NULL_BLOCK) {    // block command
-        for (auto& c : item.get_items()) {
-            if (!process(c, rc)) {
-                return false;
-            }
-        }
-
-        if (!cmd->post_execute()) {
-            Logger::instance()->error("post execute %s error", item.get_name().c_str());
+    // block command
+    for (auto& c : item.get_items()) {
+        if (!process(c, cmd->get_name())) {
             return false;
         }
+    }
+
+    if (!cmd->post_execute()) {
+        Logger::instance()->error("post execute %s error", item.get_name().c_str());
+        return false;
     }
 
     return true;

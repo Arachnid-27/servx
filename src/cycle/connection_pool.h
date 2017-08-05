@@ -1,5 +1,5 @@
-#ifndef _CONNECTION_POLL_
-#define _CONNECTION_POLL_
+#ifndef _CONNECTION_POOL_H_
+#define _CONNECTION_POOL_H_
 
 #include <unordered_set>
 #include <vector>

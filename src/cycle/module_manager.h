@@ -2,45 +2,38 @@
 #define _MODULE_MANAGER_
 
 #include "module.h"
-#include "modules.h"
 
 namespace servx {
 
 class ModuleManager {
 public:
     ModuleManager(const ModuleManager&) = delete;
+    ModuleManager& operator=(const ModuleManager&) = delete;
 
-    Command* find_command(int type, const std::string& name) const;
-
-    template <typename T>
-    typename T::conf_t* get_conf() const;
-
-    Module* get_module(int index) const;
+    Command* find_command(const std::string& parent_name,
+        const std::string& name) const;
 
     bool for_each(std::function<bool (Module*)> func);
+
+    bool for_each_http(std::function<bool (HttpModule*)> func);
 
     static ModuleManager* instance() { return manager; }
 
 private:
     ModuleManager();
 
-    void create_module(int index, Module* module);
+    template <typename T, typename U>
+    void install_module(T* module, std::vector<U*>& vec);
 
-    Module* modules[NULL_MODULE];
-    // TODO: use double map
-    std::unordered_map<std::string, Command*> commands[NULL_BLOCK];
+    std::vector<CoreModule*> core_modules;
+    std::vector<EventModule*> event_modules;
+    std::vector<HttpModule*> http_modules;
+
+    std::unordered_map<std::string,
+        std::unordered_map<std::string, Command*>> commands;
 
     static ModuleManager* manager;
 };
-
-inline Module* ModuleManager::get_module(int index) const {
-    return reinterpret_cast<Module*>(modules[index]);
-}
-
-template <typename T>
-inline typename T::conf_t* ModuleManager::get_conf() const {
-    return static_cast<T*>(modules[T::index])->get_conf();
-}
 
 }
 

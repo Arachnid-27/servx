@@ -94,7 +94,7 @@ bool Listener::open_listenings() {
         conn->get_read_event()->set_handler(
             [lst](Event* ev) { accept_event_handler(lst, ev); });
 
-        if (!add_event(conn->get_read_event(), 0)) {
+        if (!add_event(conn->get_read_event())) {
             Logger::instance()->error("can not add event");
             return false;
         }
@@ -113,7 +113,7 @@ bool Listener::enable_all() {
             continue;
         }
 
-        add_event(conn->get_read_event(), 0);
+        add_event(conn->get_read_event());
     }
 
     return true;
@@ -128,7 +128,7 @@ bool Listener::disable_all() {
             continue;
         }
 
-        del_event(conn->get_read_event(), 0);
+        del_event(conn->get_read_event());
     }
 
     return true;

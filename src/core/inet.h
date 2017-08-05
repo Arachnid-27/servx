@@ -42,7 +42,8 @@ uint16_t get_port_from_sockaddr(const sockaddr* addr);
 
 class TcpSocket {
 public:
-    TcpSocket(): fd(-1), send_buf(-1), recv_buf(-1) {}
+    TcpSocket(): fd(-1), addr_str("*"), port_str("80"),
+        send_buf(-1), recv_buf(-1) {}
 
     TcpSocket(const TcpSocket&) = delete;
     TcpSocket(TcpSocket&&) = delete;
@@ -56,6 +57,9 @@ public:
     sockaddr* get_addr() { return addr.get_sockaddr(); }
     uint16_t get_port() { return addr.get_port(); }
 
+    void set_addr_str(const std::string& s) { addr_str = s; }
+    void set_port_str(const std::string& s) { port_str = s; }
+
     void set_send_buf(int s) { send_buf = s; }
     void set_recv_buf(int s) { recv_buf = s; }
 
@@ -64,8 +68,7 @@ public:
 
     bool is_wildcard() const { return addr.is_wildcard(); }
 
-    int init_addr(const std::string& host, const std::string& port,
-        bool resolve = false);
+    int init_addr(bool resolve = false);
 
     int close();
 
@@ -77,6 +80,9 @@ protected:
     int fd;
 
 private:
+    std::string addr_str;
+    std::string port_str;
+
     int send_buf;
     int recv_buf;
 };

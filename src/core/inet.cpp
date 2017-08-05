@@ -48,8 +48,7 @@ TcpSocket::~TcpSocket() {
     }
 }
 
-int TcpSocket::init_addr(const std::string& host, const std::string& port,
-    bool resolve) {
+int TcpSocket::init_addr(bool resolve) {
     addrinfo *res;
     addrinfo hint;
 
@@ -63,7 +62,7 @@ int TcpSocket::init_addr(const std::string& host, const std::string& port,
 
     // Todo * return ipv6
 
-    if (getaddrinfo(host.c_str(), port.c_str(), &hint, &res) != 0) {
+    if (getaddrinfo(addr_str.c_str(), port_str.c_str(), &hint, &res) != 0) {
         return SERVX_ERROR;
     }
 

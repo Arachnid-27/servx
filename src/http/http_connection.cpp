@@ -16,7 +16,7 @@ void HttpConnection::wait_request(Event* ev) {
     auto srv = listening->get_default_server();
 
     if (conn->get_recv_buf() == nullptr) {
-        conn->init_recv_buf(srv->get_core_conf()->client_header_timeout);
+        conn->init_recv_buf(srv->get_timeout());
     }
 
     int n = conn->recv_data();
@@ -32,7 +32,7 @@ void HttpConnection::wait_request(Event* ev) {
     if (n == SERVX_AGAIN) {
         if (!ev->is_timer()) {
             Timer::instance()->add_timer(ev,
-                srv->get_core_conf()->client_header_timeout);
+                srv->get_timeout());
         }
         ConnectionPool::instance()->enable_reusable(conn);
         return;

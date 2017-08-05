@@ -5,7 +5,6 @@
 #include "http_header.h"
 #include "http_request_body.h"
 #include "http_response.h"
-#include "modules.h"
 #include "server.h"
 
 namespace servx {
@@ -58,12 +57,13 @@ public:
     template <typename T>
     typename T::request_context_t* get_context() {
         return static_cast<typename T::request_context_t*>(
-            context[T::index].get());
+            context[*reinterpret_cast<uintptr_t*>(&T::instance)].get());
     }
 
     template <typename T>
     void set_context(HttpRequestContext* ctx) {
-        context[T::index] = std::unique_ptr<HttpRequestContext>(ctx);
+        context[*reinterpret_cast<uintptr_t*>(&T::instance)] =
+            std::unique_ptr<HttpRequestContext>(ctx);
     }
 
     int read_headers();
@@ -88,7 +88,8 @@ private:
     HttpRequestBody body;
     HttpResponse response;
 
-    std::unique_ptr<HttpRequestContext> context[NULL_MODULE];
+    std::unordered_map<uintptr_t,
+        std::unique_ptr<HttpRequestContext>> context;
 
     uint32_t phase;
     uint32_t phase_index;

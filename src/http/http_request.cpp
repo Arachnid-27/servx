@@ -55,8 +55,7 @@ int HttpRequest::read_headers() {
 
     if (n == SERVX_AGAIN) {
         if (!ev->is_timer()) {
-            Timer::instance()->add_timer(ev,
-                server->get_core_conf()->client_header_timeout);
+            Timer::instance()->add_timer(ev, server->get_timeout());
         }
         ConnectionPool::instance()->enable_reusable(conn);
         return SERVX_AGAIN;
@@ -247,7 +246,7 @@ void HttpRequest::close(int status) {
         if (response.send_header() == SERVX_AGAIN) {
             set_write_handler(HttpResponse::send_response_handler);
             Timer::instance()->add_timer(conn->get_write_event(), 60000);
-            if (!add_event(conn->get_write_event(), 0)) {
+            if (!add_event(conn->get_write_event())) {
                 Logger::instance()->warn("add event failed");
             }
             // TODO: maybe reuse
@@ -276,7 +275,7 @@ void HttpRequest::close(int status) {
         conn->get_write_event()->set_ready(false);
         conn->get_write_event()->set_handler(Event::empty_write_handler);
 
-        if (!del_event(conn->get_write_event(), 0)) {
+        if (!del_event(conn->get_write_event())) {
             Logger::instance()->warn("del event failed");
             return;
         }

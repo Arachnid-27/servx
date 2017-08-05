@@ -92,7 +92,7 @@ int HttpPhaseRunner::content_phase_checker(HttpRequest* req) {
     if (rc == SERVX_AGAIN) {
         // TODO: timeout
         req->set_write_handler(HttpResponse::send_response_handler);
-        if (!add_event(req->get_connection()->get_write_event(), 0)) {
+        if (!add_event(req->get_connection()->get_write_event())) {
             Logger::instance()->warn("add write event failed");
             req->finalize(HTTP_INTERNAL_SERVER_ERROR);
         }
@@ -129,7 +129,7 @@ int HttpPhaseRunner::find_config_handler(HttpRequest* req) {
 
     long len = req->get_request_body()->get_content_length();
     if (len > 0 &&
-        loc->get_core_conf()->client_max_body_size < len) {
+        loc->get_max_body_size() < len) {
         Logger::instance()->warn(
             "client body too large, %d bytes in tatol", len);
         return HTTP_REQUEST_ENTITY_TOO_LARGE;

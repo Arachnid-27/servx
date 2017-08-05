@@ -40,7 +40,7 @@ private:
 
     bool parse_value(ConfItem* item);
 
-    bool process(const ConfItem& item, int block);
+    bool process(const ConfItem& item, const std::string& block);
 
     int next_token();
 

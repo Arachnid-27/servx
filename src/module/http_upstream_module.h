@@ -6,36 +6,41 @@
 
 namespace servx {
 
-struct HttpUpstreamMainConf: public ModuleConf {
+struct HttpUpstreamConf {
     std::unordered_map<
         std::string, std::unique_ptr<HttpUpstream>> upstreams;
+    std::unique_ptr<HttpUpstream> temp_upstream;
 };
 
-class HttpUpstreamModule
-    : public HttpModuleWithConf<HttpUpstreamMainConf,
-                                void, void, HTTP_UPSTREAM_MODULE> {
+class HttpUpstreamModule: public HttpModule {
 public:
-    HttpUpstreamModule(): HttpModuleWithConf(
-        {
-            new Command(HTTP_BLOCK,
-                        "upstream",
-                        lambda_handler(upstream_handler), 1,
-                        lambda_post_handler(upstream_post_handler)),
-            new Command(UPSTREAM_BLOCK,
-                        "server",
-                        lambda_handler(server_handler), 2)
-        }) {}
+    using srv_conf_t = void;
+    using loc_conf_t = void;
 
-    int upstream_handler(command_vals_t v);
-    bool upstream_post_handler();
-
-    int server_handler(command_vals_t v);
-
-    static HttpUpstream* get_upstream() { return upstream.get(); }
-
-private:
-    static std::unique_ptr<HttpUpstream> upstream;
+    static HttpUpstreamConf conf;
+    static HttpUpstreamModule instance;
+    static std::vector<Command*> commands;
 };
+
+namespace command {
+
+class Upstream: public Command {
+public:
+    Upstream(): Command("http", "upstream", 1) {}
+
+    bool execute(const command_args_t& v) override;
+
+    bool post_execute() override;
+};
+
+class UpServer: public Command {
+public:
+    UpServer(): Command("upstream", "server", 2) {}
+
+    bool execute(const command_args_t& v) override;
+};
+
+}
 
 }
 

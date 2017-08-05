@@ -2,59 +2,66 @@
 #define _CORE_MODULE_
 
 #include "module.h"
-#include "modules.h"
 
 namespace servx {
 
-class CoreModule: public Module {
-protected:
-    CoreModule(const std::initializer_list<Command*>& v): Module(CORE_MODULE, v) {}
-};
-
-struct MainCoreConf: public ModuleConf {
+struct MainCoreConf {
     int rlimit_nofile;
     int worker;
     bool daemon;
 };
 
-class MainCoreModule: public ModuleWithConf<CoreModule,
-                                            MainCoreConf,
-                                            MAIN_CORE_MODULE> {
+class MainCoreModule: public CoreModule {
 public:
-    MainCoreModule(): ModuleWithConf(
-        {
-            new Command(CORE_BLOCK,
-                        "worker",
-                        lambda_handler(worker_handler), 1),
-            new Command(CORE_BLOCK,
-                        "daemon",
-                        lambda_handler(daemon_handler), 1),
-            new Command(CORE_BLOCK,
-                        "rlimit_nofile",
-                        lambda_handler(rlimit_nofile_handler), 1),
-            new Command(CORE_BLOCK,
-                        "error_log",
-                        lambda_handler(error_log_handler))
-        }) {}
-
     bool init_conf() override;
 
     bool init_module() override;
 
-    int worker_handler(command_vals_t v) {
-        return set_conf_int<MainCoreConf,
-           &MainCoreConf::worker>(conf, v[0]);
-    }
-
-    int daemon_handler(command_vals_t v);
-
-    int rlimit_nofile_handler(command_vals_t v) {
-        return set_conf_int<MainCoreConf,
-            &MainCoreConf::rlimit_nofile>(conf, v[0]);
-    }
-
-    int error_log_handler(command_vals_t v);
+    static MainCoreConf conf;
+    static MainCoreModule instance;
+    static std::vector<Command*> commands;
 };
+
+namespace command {
+
+class Worker: public Command {
+public:
+    Worker(): Command("core", "worker", 1) {}
+
+    bool execute(const command_args_t& v) override {
+        return integer_parse(&MainCoreModule::conf,
+            &MainCoreConf::worker, v);
+    }
+};
+
+class Daemon: public Command {
+public:
+    Daemon(): Command("core", "daemon", 1) {}
+
+    bool execute(const command_args_t& v) override {
+        return boolean_parse(&MainCoreModule::conf,
+            &MainCoreConf::daemon, v);
+    }
+};
+
+class RlimitNofile: public Command {
+public:
+    RlimitNofile(): Command("core", "rlimit_nofile", 1) {}
+
+    bool execute(const command_args_t& v) override {
+        return integer_parse(&MainCoreModule::conf,
+            &MainCoreConf::rlimit_nofile, v);
+    }
+};
+
+class ErrorLog: public Command {
+public:
+    ErrorLog(): Command("core", "error_log", -1) {}
+
+    bool execute(const command_args_t& v) override;
+};
+
+}
 
 }
 

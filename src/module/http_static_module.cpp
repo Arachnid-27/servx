@@ -6,6 +6,9 @@
 
 namespace servx {
 
+HttpStaticModule HttpStaticModule::instance;
+std::vector<Command*> HttpStaticModule::commands;
+
 bool HttpStaticModule::post_configuration() {
     HttpPhaseRunner::instance()->register_handler(
         HTTP_CONTENT_PHASE, http_static_handler);

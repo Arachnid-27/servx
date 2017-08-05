@@ -39,7 +39,7 @@ Server* HttpListening::search_server(const std::string& name) {
 }
 
 void HttpListening::init_connection(Connection* conn) {
-    if (!add_event(conn->get_read_event(), 0)) {
+    if (!add_event(conn->get_read_event())) {
         Logger::instance()->error("add event failed");
         conn->close();
         return;
@@ -62,8 +62,8 @@ void HttpListening::init_connection(Connection* conn) {
         return;
     }
 
-    auto conf = hl->get_default_server()->get_core_conf();
-    Timer::instance()->add_timer(conn->get_read_event(), conf->client_header_timeout);
+    Timer::instance()->add_timer(conn->get_read_event(),
+        hl->get_default_server()->get_timeout());
     ConnectionPool::instance()->enable_reusable(conn);
 
     Logger::instance()->debug("init connection success!");

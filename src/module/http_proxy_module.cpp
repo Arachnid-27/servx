@@ -1,7 +1,7 @@
 #include "http_proxy_module.h"
 
 #include "event_module.h"
-#include "http_core_module.h"
+#include "http_module.h"
 #include "http_upstream_module.h"
 #include "http_upstream_request.h"
 #include "logger.h"
@@ -9,28 +9,10 @@
 
 namespace servx {
 
-int HttpProxyModule::proxy_pass_handler(command_vals_t v) {
-    // TODO: not only upstream
-
-    auto &upstreams = ModuleManager::instance()
-        ->get_conf<HttpUpstreamModule>()->upstreams;
-    auto iter = upstreams.find(v[0]);
-
-    if (iter == upstreams.end()) {
-        Logger::instance()->error(
-            "can not find upstreams whose name is %s", v[0].c_str());
-        return SERVX_ERROR;
-    }
-
-    auto loc = HttpCoreModule::get_cur_location();
-    auto conf = loc->get_conf<HttpProxyModule>();
-
-    loc->set_content_handler(proxy_pass_content_handler);
-    conf->upstreams = iter->second.get();
-    conf->url = v[0];
-
-    return NULL_BLOCK;
-}
+HttpProxyModule HttpProxyModule::instance;
+std::vector<Command*> HttpProxyModule::commands = {
+    new command::ProxyPass
+};
 
 int HttpProxyModule::proxy_pass_content_handler(HttpRequest* req) {
     Logger::instance()->debug("proxy pass content handler");
@@ -85,7 +67,7 @@ int HttpProxyModule::proxy_pass_response_header_handler(
         ctx->out.push_back(buf);
         req->set_write_handler(proxy_pass_write_handler);
         Event *ev = req->get_connection()->get_write_event();
-        if (!ev->is_active() && !add_event(ev, 0)) {
+        if (!ev->is_active() && !add_event(ev)) {
             Logger::instance()->warn("add write event error");
             return SERVX_ERROR;
         }
@@ -116,7 +98,7 @@ int HttpProxyModule::proxy_pass_response_body_handler(
         ctx->out.push_back(buf);
         req->set_write_handler(proxy_pass_write_handler);
         Event *ev = req->get_connection()->get_write_event();
-        if (!ev->is_active() && !add_event(ev, 0)) {
+        if (!ev->is_active() && !add_event(ev)) {
             Logger::instance()->warn("add write event error");
             return SERVX_ERROR;
         }
@@ -155,6 +137,32 @@ void HttpProxyModule::proxy_pass_write_handler(HttpRequest* req) {
             req->close(SERVX_OK);
         }
     }
+}
+
+namespace command {
+
+bool ProxyPass::execute(const command_args_t& v) {
+    // TODO: not only upstream
+
+    auto &upstreams = HttpUpstreamModule::conf.upstreams;
+    auto iter = upstreams.find(v[0]);
+
+    if (iter == upstreams.end()) {
+        Logger::instance()->error(
+            "can not find upstreams whose name is %s", v[0].c_str());
+        return false;
+    }
+
+    auto &loc = HttpMainModule::conf.temp_location;
+    loc->set_content_handler(HttpProxyModule::proxy_pass_content_handler);
+
+    auto conf = loc->get_conf<HttpProxyModule>();
+    conf->upstreams = iter->second.get();
+    conf->url = v[0];
+
+    return true;
+}
+
 }
 
 }

@@ -7,7 +7,7 @@
 
 namespace servx {
 
-struct HttpProxyLocConf: public ModuleConf {
+struct HttpProxyLocConf: public HttpConf {
     std::string url;
     HttpUpstream* upstreams;
 };
@@ -17,20 +17,16 @@ struct HttpProxyRequestContext: public HttpRequestContext {
     std::list<Buffer*> out;
 };
 
-class HttpProxyModule
-    : public HttpModuleWithConf<void, void,
-                                HttpProxyLocConf,
-                                HTTP_PROXY_MODULE,
-                                HttpProxyRequestContext> {
+class HttpProxyModule: public HttpModule {
 public:
-    HttpProxyModule(): HttpModuleWithConf(
-        {
-            new Command(LOCATION_BLOCK,
-                        "proxy_pass",
-                        lambda_handler(proxy_pass_handler), 1)
-        }) {}
+    using srv_conf_t = void;
+    using loc_conf_t = HttpProxyLocConf;
+    using request_context_t = HttpProxyRequestContext;
 
-    int proxy_pass_handler(command_vals_t v);
+    virtual HttpConf* create_loc_conf() { return new HttpProxyLocConf(); }
+
+    static HttpProxyModule instance;
+    static std::vector<Command*> commands;
 
     static int proxy_pass_content_handler(HttpRequest* req);
 
@@ -46,6 +42,17 @@ public:
 
     static void proxy_pass_write_handler(HttpRequest* ev);
 };
+
+namespace command {
+
+class ProxyPass: public Command {
+public:
+    ProxyPass(): Command("location", "proxy_pass", 1) {}
+
+    bool execute(const command_args_t& v) override;
+};
+
+}
 
 }
 

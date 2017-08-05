@@ -6,14 +6,17 @@
 
 namespace servx {
 
-class HttpStaticModule
-    : public HttpModuleWithConf<void, void, void, HTTP_STATIC_MODULE> {
+class HttpStaticModule: public HttpModule {
 public:
-    HttpStaticModule(): HttpModuleWithConf({}) {}
+    using srv_conf_t = void;
+    using loc_conf_t = void;
 
     bool post_configuration() override;
 
     static int http_static_handler(HttpRequest* req);
+
+    static HttpStaticModule instance;
+    static std::vector<Command*> commands;
 };
 
 }

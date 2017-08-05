@@ -25,8 +25,7 @@ void accept_event_handler(Listening* lst, Event* ev) {
         }
     }
 
-    bool multi_accept = ModuleManager::instance()
-        ->get_conf<MainEventModule>()->multi_accept;
+    bool multi_accept = EventCoreModule::conf.multi_accept;
     Connection *conn = ev->get_connection();
 
     sockaddr sa;

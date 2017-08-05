@@ -7,7 +7,9 @@ namespace servx {
 bool HttpUpstream::push_server(
     const std::string& host, const std::string& port) {
     std::unique_ptr<TcpConnectSocket> socket(new TcpConnectSocket());
-    if (socket->init_addr(host, port, true) == SERVX_ERROR) {
+    socket->set_addr_str(host);
+    socket->set_port_str(port);
+    if (socket->init_addr(true) == SERVX_ERROR) {
         Logger::instance()->error("[upstream %s] push %s %s error",
             name.c_str(), host.c_str(), port.c_str());
         return false;

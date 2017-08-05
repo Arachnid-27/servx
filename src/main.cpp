@@ -22,15 +22,13 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    auto conf = ModuleManager::instance()->get_conf<MainCoreModule>();
-
-    if (conf->daemon) {
+    if (MainCoreModule::conf.daemon) {
         daemonize();
     }
 
     servx::signal(SIGPIPE, SIG_IGN);
 
-    for (auto i = 0; i < conf->worker; ++i) {
+    for (auto i = 0; i < MainCoreModule::conf.worker; ++i) {
         ProcessManager::instance()->push(worker_process_cycle);
     }
 
