@@ -49,10 +49,14 @@ int HttpProxyModule::proxy_pass_response_header_handler(
         auto first = location.begin() + 7;
         auto last = std::find(first, location.end(), '/');
         location.replace(first, last, host.c_str());
-        // avoid refill buffer
-        buf->reset();
-        resp->fill_response_header(buf);
     }
+
+    // server
+    resp->set_header("server", "servx/0.1");
+
+    // TODO: avoid refill buffer
+    buf->reset();
+    resp->fill_response_header(buf);
 
     int size = buf->get_size();
     int rc = req->get_connection()->send_data(buf, size);
@@ -128,8 +132,6 @@ void HttpProxyModule::proxy_pass_write_handler(HttpRequest* req) {
         if (req->get_connection()->is_error()) {
             Logger::instance()->info("connection error");
         }
-
-        // FIXME return buffer
 
         out.erase(first, iter);
 

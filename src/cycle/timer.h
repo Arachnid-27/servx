@@ -38,10 +38,8 @@ public:
 private:
     Timer() = default;
 
-private:
     std::set<Event*, TimerCompare> timer_tree;
 
-private:
     static Timer *timer;
 };
 

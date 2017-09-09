@@ -148,8 +148,6 @@ void HttpRequest::process_headers(Event* ev) {
 }
 
 void HttpRequest::process_line(Event* ev) {
-    Connection *conn = ev->get_connection();
-
     if (ev->is_timeout()) {
         Logger::instance()->info("%d client time out", HTTP_REQUEST_TIME_OUT);
         conn->set_timeout(true);
@@ -269,6 +267,7 @@ void HttpRequest::close(int status) {
         Timer::instance()->add_timer(conn->get_read_event(), 120000);
         HttpConnection *hc = conn->get_context<HttpConnection>();
         conn->get_recv_buf()->shrink();
+        // TODO: pipeline
         conn->get_read_event()->set_ready(false);
         conn->get_read_event()->set_handler([hc](Event* ev)
             { hc->wait_request(ev); });

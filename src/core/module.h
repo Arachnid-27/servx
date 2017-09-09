@@ -23,10 +23,10 @@ public:
 
     virtual bool exit_module() { return true; }
 
-    virtual ~Module() {}
+    virtual ~Module() = default;
 
 protected:
-    Module() {}
+    Module() = default;
 };
 
 class CoreModule: public Module {
@@ -47,7 +47,7 @@ public:
 
 class HttpConf {
 public:
-    virtual ~HttpConf() {}
+    virtual ~HttpConf() = default;
 };
 
 class HttpModule: public Module {

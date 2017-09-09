@@ -69,13 +69,13 @@ int HttpRequestBody::handle_read() {
             return rc;
         }
 
-        if (rc == 0) {
+        recv += rc;
+
+        if (recv != content_length && conn->get_read_event()->is_eof()) {
             Logger::instance()->info("client permaturely closed connection");
-            conn->get_read_event()->set_eof(true);
             return SERVX_ERROR;
         }
 
-        recv += rc;
         if (recv == content_length) {
             if (conn->get_read_event()->is_timer()) {
                 Timer::instance()->del_timer(conn->get_read_event());

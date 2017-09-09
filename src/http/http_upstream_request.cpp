@@ -27,7 +27,9 @@ void HttpUpstreamRequest::close(int rc) {
     // TODO: keep-alive
     Logger::instance()->debug("close http upstream request, rc = %d", rc);
     finalize_handler(request, rc);
-    conn->close();
+    if (conn != nullptr) {
+        conn->close();
+    }
 }
 
 int HttpUpstreamRequest::connect() {
@@ -274,6 +276,7 @@ void HttpUpstreamRequest::recv_response_body_handler(Event* ev) {
     while (true) {
         buf = response_body_bufs.back();
         size = buf->get_remain();
+        // FIXME conn will be null
         n = conn->recv_data(buf, size);
 
         if (n < 0) {

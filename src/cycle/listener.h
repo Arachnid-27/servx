@@ -10,7 +10,8 @@
 
 namespace servx {
 
-struct ListeningContext {
+class ListeningContext {
+public:
     virtual ~ListeningContext() {}
 };
 

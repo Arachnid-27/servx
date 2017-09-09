@@ -194,6 +194,9 @@ int HttpResponse::send() {
         auto &files = out.front().files;
 
         if (!files.empty()) {
+            // FIXME:
+            // maybe the size of file is large
+            // we should not send it in one time
             if (request->get_location()->is_send_file()) {
                 auto iter = files.begin();
                 while (!files.empty()) {

@@ -16,7 +16,7 @@ void HttpConnection::wait_request(Event* ev) {
     auto srv = listening->get_default_server();
 
     if (conn->get_recv_buf() == nullptr) {
-        conn->init_recv_buf(srv->get_timeout());
+        conn->init_recv_buf(srv->get_buffer_size());
     }
 
     int n = conn->recv_data();

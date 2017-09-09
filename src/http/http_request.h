@@ -57,12 +57,12 @@ public:
     template <typename T>
     typename T::request_context_t* get_context() {
         return static_cast<typename T::request_context_t*>(
-            context[*reinterpret_cast<uintptr_t*>(&T::instance)].get());
+            context[reinterpret_cast<uintptr_t>(&T::instance)].get());
     }
 
     template <typename T>
     void set_context(HttpRequestContext* ctx) {
-        context[*reinterpret_cast<uintptr_t*>(&T::instance)] =
+        context[reinterpret_cast<uintptr_t>(&T::instance)] =
             std::unique_ptr<HttpRequestContext>(ctx);
     }
 

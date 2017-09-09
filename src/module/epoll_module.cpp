@@ -190,7 +190,7 @@ bool EpollModule::process_events() {
     for (int i = 0; i < n; ++i) {
         c = static_cast<Connection*>(event_list[i].data.ptr);
 
-        if (c->is_close()) {    // Todo handle stale event
+        if (c->is_close()) {    // TODO handle stale event
             Logger::instance()->info("connection already closed");
             continue;
         }
@@ -204,10 +204,8 @@ bool EpollModule::process_events() {
         event = c->get_read_event();
 
         if ((flags & EPOLLIN) && event->is_active()) {
-            Logger::instance()->debug("handle read event %p...", event);
-
             if (flags & EPOLLRDHUP) {
-                // Todo
+                event->set_eof(true);
             }
 
             event->set_ready(true);
@@ -217,8 +215,7 @@ bool EpollModule::process_events() {
         event = c->get_write_event();
 
         if ((flags & EPOLLOUT) && event->is_active()) {
-            Logger::instance()->debug("handle write event %p...", event);
-            if (c->is_close()) {    // Todo handle stale event
+            if (c->is_close()) {    // TODO handle stale event
                 continue;
             }
 

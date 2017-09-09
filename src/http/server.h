@@ -35,6 +35,7 @@ public:
     int get_timeout() const { return timeout; }
     void set_timeout(int t) { timeout = t; }
 
+    int get_buffer_size() { return buffer_size; }
     void set_buffer_size(int sz) { buffer_size = sz; }
 
     template <typename T>
@@ -59,7 +60,7 @@ inline bool Server::contain_server_name(const std::string& name) const {
 template <typename T>
 inline typename T::srv_conf_t* Server::get_conf() {
     return static_cast<typename T::srv_conf_t*>(
-        confs[*reinterpret_cast<uintptr_t*>(&T::instance)].get());
+        confs[reinterpret_cast<uintptr_t>(&T::instance)].get());
 }
 
 }

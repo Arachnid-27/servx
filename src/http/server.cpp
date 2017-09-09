@@ -9,7 +9,7 @@ namespace servx {
 Server::Server(): timeout(60000), buffer_size(4096) {
     auto manager = ModuleManager::instance();
     manager->for_each_http([this](HttpModule* module) {
-            confs[*reinterpret_cast<uintptr_t*>(&module)] =
+            confs[reinterpret_cast<uintptr_t>(&module)] =
                 std::unique_ptr<HttpConf>(module->create_srv_conf());
             return true;
         });
