@@ -30,9 +30,10 @@ void Timer::del_timer(Event* ev) {
     if (it != timer_tree.end()) {
         timer_tree.erase(it);
         ev->set_timer(0);
-    } else {
+    } else if (ev->is_timer()) {
         Logger::instance()->warn("can not find timer %p, %ld",
             ev, ev->get_timer());
+        ev->set_timer(0);
     }
 }
 

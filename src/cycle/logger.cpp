@@ -4,6 +4,7 @@
 
 #include "clock.h"
 #include "io.h"
+#include "errno.h"
 
 namespace servx {
 
@@ -44,7 +45,7 @@ void Logger::open_files() {
 
     while (iter != files.end()) {
         if (!iter->open(flags, mode)) {
-            warn("open %s failed, ignore", iter->get_pathname().c_str());
+            warn("open %s failed, get %d, ignore", iter->get_pathname().c_str(), errno);
             iter = files.erase(iter);
         } else {
             ++iter;

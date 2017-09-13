@@ -40,7 +40,10 @@ public:
 
     static void proxy_pass_finalize_handler(HttpRequest* req, int rc);
 
-    static void proxy_pass_write_handler(HttpRequest* ev);
+    static void proxy_pass_write_handler(HttpRequest* req);
+
+private:
+    static int proxy_pass_write_out(Connection* conn, std::list<Buffer*>& out);
 };
 
 namespace command {

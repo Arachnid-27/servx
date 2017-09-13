@@ -47,12 +47,6 @@ HttpResponse::HttpResponse(HttpRequest* r)
       keep_alive(0), etag(0), sent(0) {
 }
 
-HttpResponse::~HttpResponse() {
-    std::for_each(out.begin(), out.end(), [this](Sendable& s)
-        { std::for_each(s.chain.begin(), s.chain.end(), [this](Buffer* b)
-            { request->get_server()->ret_buffer(b); }); });
-}
-
 int HttpResponse::send_header() {
     if (status == -1) {
         return SERVX_ERROR;
@@ -71,7 +65,7 @@ int HttpResponse::send_header() {
     out.emplace_back();
 
     int n;
-    Buffer *buf = request->get_server()->get_buffer();
+    Buffer *buf = request->get_buffer();
     std::list<Buffer*> &chain = out.back().chain;
     chain.emplace_back(buf);
     char *pos = buf->get_pos();
@@ -181,9 +175,6 @@ int HttpResponse::send() {
             }
 
             sent = 1;
-            std::for_each(first, iter,
-                [this](Buffer* buf)
-                { request->get_server()->ret_buffer(buf); });
             chain.erase(first, iter);
 
             if (iter != last) {
@@ -210,7 +201,7 @@ int HttpResponse::send() {
                     iter = files.erase(iter);
                 }
             } else {
-                chain.emplace_back(request->get_server()->get_buffer());
+                chain.emplace_back(request->get_buffer());
                 auto iter = files.begin();
                 while (!files.empty()) {
                     if (!(*iter)->file_status()) {
@@ -236,7 +227,7 @@ int HttpResponse::send() {
                         iter = files.erase(iter);
                         continue;
                     } else if (chain.back()->get_remain() == 0) {
-                        chain.emplace_back(request->get_server()->get_buffer());
+                        chain.emplace_back(request->get_buffer());
                         continue;
                     } else {
                         break;

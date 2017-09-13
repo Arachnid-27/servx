@@ -2,20 +2,23 @@
 #define _BUFFER_H_
 
 #include <cstdint>
+#include <list>
+#include <memory>
 
 namespace servx {
 
 class Buffer {
 public:
     explicit Buffer(uint32_t cap);
-    Buffer(char* data, uint32_t size, bool del);
 
     Buffer(const Buffer&) = delete;
     Buffer(Buffer&&) = default;
     Buffer& operator=(const Buffer&) = delete;
     Buffer& operator=(Buffer&&) = default;
 
-    ~Buffer();
+    ~Buffer() {
+        delete[] start;
+    }
 
     char* get_pos() const { return pos; }
     void set_pos(char* p) { pos = p; }
@@ -42,7 +45,27 @@ private:
     char *end;
     char *pos;
     char *last;
-    bool deleteable;
+};
+
+class BufferPool {
+public:
+    BufferPool(size_t sz = 4096): buffer_size(sz) {}
+
+    BufferPool(const BufferPool&) = delete;
+    BufferPool(BufferPool&&) = delete;
+    BufferPool& operator=(const BufferPool&) = delete;
+    BufferPool& operator=(BufferPool&&) = delete;
+
+    ~BufferPool() = default;
+
+    Buffer* get_buffer() {
+        all_bufs.emplace_back(buffer_size);
+        return &all_bufs.back();
+    }
+
+private:
+    size_t buffer_size;
+    std::list<Buffer> all_bufs;
 };
 
 }

@@ -140,7 +140,6 @@ private:
 };
 
 class HttpResponseHeader: public HttpHeader {
-    friend class HttpUpstreamRequest;
 public:
     HttpResponseHeader(Buffer *buf): HttpHeader(buf) {}
 

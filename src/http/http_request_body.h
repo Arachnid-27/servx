@@ -22,7 +22,7 @@ public:
     HttpRequestBody& operator=(const HttpRequestBody&) = delete;
     HttpRequestBody& operator=(HttpRequestBody&&) = delete;
 
-    ~HttpRequestBody();
+    ~HttpRequestBody() = default;
 
     int read(const http_req_handler_t& h);
     int discard();

@@ -5,27 +5,25 @@
 #include <list>
 #include <unordered_map>
 
-#include "buffer.h"
 #include "connection.h"
 #include "http_header.h"
-#include "http_request.h"
 #include "http_upstream_server.h"
-#include "logger.h"
+#include "http_upstream_response.h"
+#include "inet.h"
 
 namespace servx {
 
 class HttpUpstreamRequest {
 public:
+    friend class HttpUpstreamResponse;
+
     HttpUpstreamRequest(HttpUpstreamServer* srv, HttpRequest* req,
-        const std::function<int(HttpRequest*, Buffer*)>& rhh,
-        const std::function<int(HttpRequest*, Buffer*)>& rbh,
-        const std::function<void(HttpRequest*, int)>& fh)
-        : server(srv), request(req),
+        std::function<int(HttpRequest*, Buffer*)> rhh,
+        std::function<int(HttpRequest*, Buffer*)> rbh,
+        std::function<void(HttpRequest*, int)> fh)
+        : server(srv), request(req), finished(false),
+          response(this, rhh, rbh),
           request_header_buf(nullptr),
-          content_length(-1), recv(0),
-          response_header_buf(nullptr),
-          response_header_handler(rhh),
-          response_body_handler(rbh),
           finalize_handler(fh) {}
 
     HttpUpstreamRequest(const HttpUpstreamRequest&) = delete;
@@ -33,29 +31,23 @@ public:
     HttpUpstreamRequest& operator=(const HttpUpstreamRequest&) = delete;
     HttpUpstreamRequest& operator=(HttpUpstreamRequest&&) = delete;
 
-    ~HttpUpstreamRequest();
+    ~HttpUpstreamRequest() = default;
 
     int connect();
 
-    void set_extra_headers(const std::string& k, const std::string& v) {
-        extra_headers[k] = v;
-    }
+    HttpUpstreamResponse& get_response() { return response; }
 
     void wait_connect_handler(Event* ev);
-
     void send_request_handler(Event* ev);
-    void recv_response_line_handler(Event* ev);
-    void recv_response_headers_handler(Event* ev);
-    void recv_response_body_handler(Event* ev);
-
-    HttpResponseHeader* get_response_header() const { return header.get(); }
 
     void close(int rc);
+
+    bool is_finished() const { return finished; }
 
 private:
     bool check_timeout(Event* ev, int rc) {
         if (ev->is_timeout()) {
-            Logger::instance()->warn("upstream timeout");
+//            Logger::instance()->warn("upstream timeout");
             ev->get_connection()->set_timeout(true);
             close(rc);
             return true;
@@ -63,41 +55,20 @@ private:
         return false;
     }
 
-    bool check_header_buf_full() {
-        if (response_header_buf->get_remain() == 0) {
-            Logger::instance()->error("response header too large");
-            close(SERVX_ERROR);
-            return true;
-        }
-        return false;
-    }
-
-    void recv_response_headers(Event* ev);
-    void response_header_done(Event* ev);
     int build_request();
-    int handle_response_body();
-    int read_response_header();
     int send_request();
 
     HttpUpstreamServer *server;
     HttpRequest *request;
     Connection* conn;
 
-    std::unordered_map<std::string, std::string> extra_headers;
+    bool finished;
 
-    std::unique_ptr<HttpResponseHeader> header;
+    HttpUpstreamResponse response;
 
     Buffer *request_header_buf;
     std::list<Buffer*> request_body_bufs;
 
-    long content_length;
-    long recv;
-
-    Buffer *response_header_buf;
-    std::list<Buffer*> response_body_bufs;
-
-    std::function<int(HttpRequest*, Buffer*)> response_header_handler;
-    std::function<int(HttpRequest*, Buffer*)> response_body_handler;
     std::function<void(HttpRequest*, int)> finalize_handler;
 };
 

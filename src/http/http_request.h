@@ -54,6 +54,8 @@ public:
     HttpRequestBody* get_request_body() { return &body; }
     HttpResponse* get_response() { return &response; }
 
+    Buffer* get_buffer() { return pool.get_buffer(); };
+
     template <typename T>
     typename T::request_context_t* get_context() {
         return static_cast<typename T::request_context_t*>(
@@ -96,6 +98,8 @@ private:
 
     Server *server;
     Location *location;
+
+    BufferPool pool;
 
     bool keep_alive;
 };

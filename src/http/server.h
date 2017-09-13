@@ -29,9 +29,6 @@ public:
 
     Location* find_location(const std::string& uri);
 
-    Buffer* get_buffer();
-    void ret_buffer(Buffer* buf);
-
     int get_timeout() const { return timeout; }
     void set_timeout(int t) { timeout = t; }
 
@@ -48,8 +45,6 @@ private:
     std::unordered_set<std::string> server_names;
     std::vector<std::unique_ptr<Location>> regex_locations;
     LocationTree prefix_locations;
-    std::list<Buffer> all_bufs;
-    std::list<Buffer*> free_bufs;
     std::unordered_map<uintptr_t, std::unique_ptr<HttpConf>> confs;
 };
 

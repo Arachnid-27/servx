@@ -22,7 +22,7 @@ public:
     HttpResponse& operator=(const HttpResponse&) = delete;
     HttpResponse& operator=(HttpResponse&&) = delete;
 
-    ~HttpResponse();
+    ~HttpResponse() = default;
 
     template <typename T1, typename T2>
     void set_headers(T1&& name, T2&& value);

@@ -21,15 +21,10 @@ public:
 
     ~HttpUpstreamServer() = default;
 
-    TcpConnectSocket& get_socket() const { return *socket; }
-
-    Buffer* get_buffer();
-    void ret_buffer(Buffer* buf);
+    TcpConnectSocket* get_socket() const { return socket.get(); }
 
 private:
     std::unique_ptr<TcpConnectSocket> socket;
-    std::list<Buffer> all_bufs;
-    std::vector<Buffer*> free_bufs;
 };
 
 }

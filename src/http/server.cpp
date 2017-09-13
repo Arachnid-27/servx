@@ -30,20 +30,4 @@ Location* Server::find_location(const std::string& uri) {
     return prefix_locations.find(uri);
 }
 
-Buffer* Server::get_buffer() {
-    if (free_bufs.empty()) {
-        all_bufs.emplace_back(buffer_size);
-        return &all_bufs.back();
-    }
-
-    Buffer *buf = free_bufs.back();
-    free_bufs.pop_back();
-    return buf;
-}
-
-void Server::ret_buffer(Buffer* buf) {
-    buf->reset();
-    free_bufs.push_back(buf);
-}
-
 }

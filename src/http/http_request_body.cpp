@@ -8,13 +8,6 @@
 
 namespace servx {
 
-HttpRequestBody::~HttpRequestBody() {
-    // we can ensure 'req' is not freed here normally
-    for (Buffer *buf : body_buffer) {
-        req->get_server()->ret_buffer(buf);
-    }
-}
-
 int HttpRequestBody::read(const http_req_handler_t& h) {
     // TODO: chunked
     if (content_length <= 0) {
@@ -22,7 +15,7 @@ int HttpRequestBody::read(const http_req_handler_t& h) {
     }
 
     handler = h;
-    body_buffer.emplace_back(req->get_server()->get_buffer());
+    body_buffer.push_back(req->get_buffer());
 
     Buffer *pre_buf = req->get_connection()->get_recv_buf();
     int pre = pre_buf->get_size();
@@ -52,7 +45,6 @@ int HttpRequestBody::handle_read() {
     int rc, size, left;
 
     if (!conn->get_read_event()->is_timer()) {
-        // TODO: del timer
         Timer::instance()->add_timer(conn->get_read_event(),
             req->get_server()->get_timeout());
     }
@@ -66,12 +58,18 @@ int HttpRequestBody::handle_read() {
         rc = conn->recv_data(buf, size);
 
         if (rc < 0) {
+            if (conn->get_read_event()->is_timer()) {
+                Timer::instance()->del_timer(conn->get_read_event());
+            }
             return rc;
         }
 
         recv += rc;
 
         if (recv != content_length && conn->get_read_event()->is_eof()) {
+            if (conn->get_read_event()->is_timer()) {
+                Timer::instance()->del_timer(conn->get_read_event());
+            }
             Logger::instance()->info("client permaturely closed connection");
             return SERVX_ERROR;
         }
@@ -83,7 +81,7 @@ int HttpRequestBody::handle_read() {
             req->set_read_handler(HttpRequest::http_block_reading);
             return handler(req);
         } else if (buf->get_remain() == 0) {
-            body_buffer.emplace_back(req->get_server()->get_buffer());
+            body_buffer.push_back(req->get_buffer());
         } else {
             return SERVX_AGAIN;
         }
@@ -115,7 +113,7 @@ int HttpRequestBody::discard() {
         return SERVX_OK;
     }
 
-    body_buffer.emplace_back(req->get_server()->get_buffer());
+    body_buffer.push_back(req->get_buffer());
     int rc = handle_discard();
 
     if (rc == SERVX_ERROR) {
@@ -148,8 +146,6 @@ int HttpRequestBody::handle_discard() {
         recv += rc;
         if (recv == content_length) {
             req->set_read_handler(HttpRequest::http_block_reading);
-            req->get_server()->ret_buffer(buf);
-            body_buffer.pop_back();
             discarded = 1;
             return SERVX_OK;
         }

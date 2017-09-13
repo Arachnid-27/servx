@@ -23,7 +23,10 @@ void worker_process_cycle() {
         exit(EXIT_FAILURE);
     }
 
-    Listener::instance()->open_listenings();
+    if (!Listener::instance()->open_listenings()) {
+        Logger::instance()->error("init process error");
+        exit(EXIT_FAILURE);
+    }
 
     Logger::instance()->debug("open listenings success");
 

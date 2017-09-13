@@ -3,3 +3,5 @@ servx
 *.swp
 *.sh
 log/
+dummy.test
+coredump.*

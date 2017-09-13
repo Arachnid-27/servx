@@ -52,7 +52,7 @@ public:
         ctx = std::unique_ptr<ConnectionContext>(p);
     }
 
-    Buffer* get_recv_buf() const { return recv_buf.get(); }
+    Buffer* get_recv_buf() { return recv_buf.get(); }
     void init_recv_buf(int sz);
 
     bool is_timeout() const { return timeout; }
