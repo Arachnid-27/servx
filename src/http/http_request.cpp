@@ -237,6 +237,8 @@ void HttpRequest::finalize(int rc) {
 }
 
 void HttpRequest::close(int status) {
+    Logger::instance()->debug("close http request, statu = %d", status);
+
     if (!response.is_sent() && status != SERVX_OK) {
         Logger::instance()->debug("send response, status = %d", status);
         response.set_content_length(0);

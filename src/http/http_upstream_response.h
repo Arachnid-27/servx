@@ -31,7 +31,7 @@ private:
     void recv_response_headers(Event* ev);
     void response_header_done(Event* ev);
     int handle_response_body();
-    int read_response_header();
+    int read_response_header(Connection* conn);
 
     HttpUpstreamRequest *req;
 

@@ -28,8 +28,8 @@ void accept_event_handler(Listening* lst, Event* ev) {
     bool multi_accept = EventCoreModule::conf.multi_accept;
     Connection *conn = ev->get_connection();
 
-    sockaddr sa;
-    socklen_t len;
+//    sockaddr sa;
+//    socklen_t len;
     int fd, err;
 
     ev->set_ready(false);
@@ -37,7 +37,7 @@ void accept_event_handler(Listening* lst, Event* ev) {
     Logger::instance()->debug("call accept4...");
 
     while (true) {
-        fd = accept4(conn->get_fd(), &sa, &len, SOCK_NONBLOCK);
+        fd = accept4(conn->get_fd(), NULL, NULL, SOCK_NONBLOCK);
 
         Logger::instance()->debug("accept4 return, get %d", fd);
 

@@ -22,7 +22,7 @@ void HttpUpstreamResponse::recv_response_line_handler(Event* ev) {
         Timer::instance()->add_timer(req->conn->get_read_event(), 120000);
     }
 
-    int rc = read_response_header();
+    int rc = read_response_header(ev->get_connection());
     if (rc != SERVX_OK) {
         return;
     }
@@ -54,7 +54,8 @@ void HttpUpstreamResponse::recv_response_headers_handler(Event* ev) {
         return;
     }
 
-    int rc = read_response_header();
+    int rc = read_response_header(ev->get_connection());
+
     if (rc != SERVX_OK) {
         return;
     }
@@ -164,7 +165,7 @@ void HttpUpstreamResponse::recv_response_body_handler(Event* ev) {
         buf = response_body_bufs.back();
         size = buf->get_remain();
         // FIXME conn will be null
-        n = req->conn->recv_data(buf, size);
+        n = ev->get_connection()->recv_data(buf, size);
 
         if (n < 0) {
             if (n != SERVX_AGAIN) {
@@ -177,7 +178,7 @@ void HttpUpstreamResponse::recv_response_body_handler(Event* ev) {
         if (n == 0) {
             Logger::instance()->info(
                 "recv response body, upstream permaturely closed connection");
-            req->conn->get_read_event()->set_eof(true);
+            ev->get_connection()->get_read_event()->set_eof(true);
             req->close(HTTP_BAD_GATEWAY);
             return;
         }
@@ -195,15 +196,15 @@ void HttpUpstreamResponse::recv_response_body_handler(Event* ev) {
     }
 }
 
-int HttpUpstreamResponse::read_response_header() {
-    int rc = req->conn->recv_data(response_header_buf,
+int HttpUpstreamResponse::read_response_header(Connection* conn) {
+    int rc = conn->recv_data(response_header_buf,
         response_header_buf->get_remain());
 
     switch (rc) {
     case 0:
         Logger::instance()->info(
             "read response header, upstream permaturely closed connection");
-        req->conn->get_read_event()->set_eof(true);
+        conn->get_read_event()->set_eof(true);
         req->close(HTTP_BAD_GATEWAY);
         return SERVX_ERROR;
     case SERVX_ERROR:

@@ -23,9 +23,11 @@ int HttpProxyModule::proxy_pass_content_handler(HttpRequest* req) {
         proxy_pass_response_header_handler,
         proxy_pass_response_body_handler,
         proxy_pass_finalize_handler);
+    HttpWriter *writer = new HttpWriter(req->get_connection());
 
     auto ctx = new HttpProxyRequestContext;
     ctx->hur = std::unique_ptr<HttpUpstreamRequest>(hur);
+    ctx->writer = std::unique_ptr<HttpWriter>(writer);
     req->set_context<HttpProxyModule>(ctx);
 
     return req->get_request_body()->read(proxy_pass_request_handler);
@@ -52,19 +54,17 @@ int HttpProxyModule::proxy_pass_response_header_handler(
         location.replace(first, last, host.c_str());
     }
 
-    // server
     hdrs->set_header("server", "servx/0.1");
 
     // TODO: avoid refill buffer
     buf->reset();
     hdrs->fill_response_header(buf);
-    ctx->out.push_back(buf);
+    ctx->writer->push(buf);
 
-    int rc = proxy_pass_write_out(req->get_connection(), ctx->out);
+    int rc = ctx->writer->write();
 
     if (rc == SERVX_ERROR) {
         Logger::instance()->warn("proxy pass send header error");
-        return SERVX_ERROR;
     }
 
     return rc;
@@ -74,9 +74,9 @@ int HttpProxyModule::proxy_pass_response_body_handler(
     HttpRequest* req, Buffer* buf) {
     // TODO: sometime we should buffer it
     auto ctx = req->get_context<HttpProxyModule>();
-    ctx->out.push_back(buf);
+    ctx->writer->push(buf);
 
-    int rc = proxy_pass_write_out(req->get_connection(), ctx->out);
+    int rc = ctx->writer->write();
 
     if (rc == SERVX_ERROR) {
         Logger::instance()->warn("proxy pass send body error");
@@ -87,19 +87,22 @@ int HttpProxyModule::proxy_pass_response_body_handler(
 
 void HttpProxyModule::proxy_pass_finalize_handler(HttpRequest* req, int rc) {
     Logger::instance()->debug("proxy_pass finalize, rc = %d", rc);
-    auto ctx = req->get_context<HttpProxyModule>();
-    if (rc == SERVX_OK && !ctx->out.empty()) {
-        return;
+    if (rc == SERVX_OK) {
+        auto ctx = req->get_context<HttpProxyModule>();
+        int rc = ctx->writer->set_end();
+        if (rc == SERVX_AGAIN) {
+            return;
+        }
     }
     req->finalize(rc);
 }
 
 void HttpProxyModule::proxy_pass_write_handler(HttpRequest* req) {
     auto ctx = req->get_context<HttpProxyModule>();
-    int rc = proxy_pass_write_out(req->get_connection(), ctx->out);
+    int rc = ctx->writer->write();
 
-    if (rc == SERVX_OK && ctx->hur->is_finished()) {
-        req->close(SERVX_OK);
+    if (rc == SERVX_OK) {
+        req->finalize(SERVX_OK);
         return;
     }
 
@@ -107,20 +110,6 @@ void HttpProxyModule::proxy_pass_write_handler(HttpRequest* req) {
         ctx->hur->close(SERVX_ERROR);
         return;
     }
-}
-
-int HttpProxyModule::proxy_pass_write_out(
-        Connection* conn, std::list<Buffer*>& out) {
-    if (out.empty()) {
-        return SERVX_OK;
-    }
-    auto iter = conn->send_chain(out.begin(), out.end());
-    if (conn->is_error()) {
-        Logger::instance()->info("connection error");
-        return SERVX_ERROR;
-    }
-    out.erase(out.begin(), iter);
-    return out.empty() ? SERVX_OK : SERVX_AGAIN;
 }
 
 namespace command {

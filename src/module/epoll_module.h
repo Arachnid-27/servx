@@ -11,11 +11,6 @@ struct EpollModuleConf {
     int epoll_events;
 };
 
-struct ConnectionPacked {
-    uint64_t conn_id;
-    Connection *conn;
-};
-
 class EpollModule: public EventModule {
 public:
     bool init_conf() override;

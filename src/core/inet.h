@@ -16,10 +16,10 @@ class IPSockAddr {
 public:
     IPSockAddr() = default;
 
-    IPSockAddr(const IPSockAddr&) = default;
-    IPSockAddr(IPSockAddr&&) = default;
-    IPSockAddr& operator=(const IPSockAddr&) = default;
-    IPSockAddr& operator=(IPSockAddr&&) = default;
+    IPSockAddr(const IPSockAddr&) = delete;
+    IPSockAddr(IPSockAddr&&) = delete;
+    IPSockAddr& operator=(const IPSockAddr&) = delete;
+    IPSockAddr& operator=(IPSockAddr&&) = delete;
 
     ~IPSockAddr() = default;
 
@@ -45,10 +45,10 @@ public:
     TcpSocket(): fd(-1), addr_str("*"), port_str("80"),
         send_buf(-1), recv_buf(-1) {}
 
-    TcpSocket(const TcpSocket&) = default;
-    TcpSocket(TcpSocket&&) = default;
-    TcpSocket& operator=(const TcpSocket&) = default;
-    TcpSocket& operator=(TcpSocket&&) = default;
+    TcpSocket(const TcpSocket&) = delete;
+    TcpSocket(TcpSocket&&) = delete;
+    TcpSocket& operator=(const TcpSocket&) = delete;
+    TcpSocket& operator=(TcpSocket&&) = delete;
 
     virtual ~TcpSocket();
 

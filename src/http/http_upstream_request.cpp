@@ -11,11 +11,11 @@ namespace servx {
 
 void HttpUpstreamRequest::close(int rc) {
     // TODO: keep-alive
-    finished = true;
     Logger::instance()->debug("close http upstream request, rc = %d", rc);
     finalize_handler(request, rc);
     if (conn != nullptr) {
         conn->close();
+        conn = nullptr;
     }
 }
 
@@ -39,7 +39,9 @@ int HttpUpstreamRequest::connect() {
         return SERVX_ERROR;
     }
 
+    writer = std::unique_ptr<HttpWriter>(new HttpWriter(conn));
     socket->release();
+    conn->get_read_event()->set_handler(Event::empty_read_handler);
 
     if (!add_event(conn->get_write_event())) {
         Logger::instance()->warn("add connection error");
@@ -49,7 +51,6 @@ int HttpUpstreamRequest::connect() {
 
     if (rc == SERVX_AGAIN) {
         Logger::instance()->debug("connect again");
-        conn->get_read_event()->set_handler(Event::empty_read_handler);
         conn->get_write_event()->set_handler([this](Event* ev) {
                 this->wait_connect_handler(ev);
             });
@@ -57,27 +58,15 @@ int HttpUpstreamRequest::connect() {
         return SERVX_AGAIN;
     }
 
-    if (build_request() == SERVX_ERROR) {
-        conn->close();
-        return SERVX_ERROR;
-    }
+    connect_success();
 
-    rc = send_request();
-
-    switch (rc) {
-    case SERVX_ERROR:
-        Logger::instance()->warn("send request error");
-        conn->close();
-        return SERVX_ERROR;
-    case SERVX_AGAIN:
-        conn->get_read_event()->set_handler(Event::empty_read_handler);
+    rc = do_writer();
+    if (rc == SERVX_AGAIN) {
         conn->get_write_event()->set_handler([this](Event* ev) {
                 this->send_request_handler(ev);
             });
-        return SERVX_AGAIN;
     }
-
-    return SERVX_OK;
+    return rc;
 }
 
 void HttpUpstreamRequest::wait_connect_handler(Event* ev) {
@@ -85,25 +74,13 @@ void HttpUpstreamRequest::wait_connect_handler(Event* ev) {
         return;
     }
 
-    Logger::instance()->debug("connect upstream success");
+    connect_success();
 
-    if (build_request() == SERVX_ERROR) {
-        close(HTTP_INTERNAL_SERVER_ERROR);
-        return;
-    }
-
-    int rc = send_request();
-    switch (rc) {
-    case SERVX_ERROR:
-        Logger::instance()->warn("send request error");
-        close(HTTP_INTERNAL_SERVER_ERROR);
-        break;
-    case SERVX_AGAIN:
-        conn->get_read_event()->set_handler(Event::empty_read_handler);
+    int rc = do_writer();
+    if (rc == SERVX_AGAIN) {
         conn->get_write_event()->set_handler([this](Event* ev) {
                 this->send_request_handler(ev);
             });
-        break;
     }
 }
 
@@ -111,11 +88,7 @@ void HttpUpstreamRequest::send_request_handler(Event* ev) {
     if (check_timeout(ev, HTTP_INTERNAL_SERVER_ERROR)) {
         return;
     }
-
-    int rc = send_request();
-    if (rc == SERVX_ERROR) {
-        close(HTTP_INTERNAL_SERVER_ERROR);
-    }
+    do_writer();
 }
 
 int HttpUpstreamRequest::build_request() {
@@ -164,55 +137,40 @@ int HttpUpstreamRequest::build_request() {
     return SERVX_OK;
 }
 
-int HttpUpstreamRequest::send_request() {
-    auto size = request_header_buf->get_size();
+void HttpUpstreamRequest::connect_success() {
+    Logger::instance()->debug("connect upstream success");
 
-    if (size > 0) {
-        int n = conn->send_data(request_header_buf, size);
-
-        if (conn->is_error()) {
-            Logger::instance()->warn("send data error");
-            return SERVX_ERROR;
-        }
-
-        if (static_cast<uint32_t>(n) != size) {
-            return SERVX_AGAIN;
-        }
-
-        Logger::instance()->debug("send request header success");
+    if (build_request() == SERVX_ERROR) {
+        close(HTTP_INTERNAL_SERVER_ERROR);
+        return;
     }
 
-    if (!request_body_bufs.empty()) {
-        auto first = request_body_bufs.begin();
-        auto last = request_body_bufs.end();
-        auto iter = conn->send_chain(first, last);
+    writer->push(request_header_buf);
+    writer->push(request_body_bufs);
+    writer->set_end();
+}
 
-        if (conn->is_error()) {
-            return SERVX_ERROR;
+int HttpUpstreamRequest::do_writer() {
+    int rc = writer->write();
+    switch (rc) {
+    case SERVX_OK:
+        conn->get_read_event()->set_handler([this](Event* ev) {
+                response.recv_response_line_handler(ev);
+            });
+        conn->get_write_event()->set_handler(Event::empty_write_handler);
+
+        if (!add_event(conn->get_read_event()) ||
+            !del_event(conn->get_write_event())) {
+            Logger::instance()->warn(
+                "add read event, or del write event failed");
+            close(HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        request_body_bufs.erase(first, iter);
-
-        if (iter != last) {
-            return SERVX_AGAIN;
-        }
-
-        Logger::instance()->debug("send request body success");
+        break;
+    case SERVX_ERROR:
+        close(HTTP_INTERNAL_SERVER_ERROR);
+        break;
     }
-
-    conn->get_read_event()->set_handler([this](Event* ev) {
-            response.recv_response_line_handler(ev);
-        });
-    conn->get_write_event()->set_handler(Event::empty_write_handler);
-
-    if (!add_event(conn->get_read_event()) ||
-        !del_event(conn->get_write_event())) {
-        Logger::instance()->warn(
-            "add read event, or del write event failed");
-        return SERVX_ERROR;
-    }
-
-    return SERVX_OK;
+    return rc;
 }
 
 }

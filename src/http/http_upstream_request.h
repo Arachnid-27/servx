@@ -9,6 +9,7 @@
 #include "http_header.h"
 #include "http_upstream_server.h"
 #include "http_upstream_response.h"
+#include "http_writer.h"
 #include "inet.h"
 
 namespace servx {
@@ -21,7 +22,7 @@ public:
         std::function<int(HttpRequest*, Buffer*)> rhh,
         std::function<int(HttpRequest*, Buffer*)> rbh,
         std::function<void(HttpRequest*, int)> fh)
-        : server(srv), request(req), finished(false),
+        : server(srv), request(req), conn(nullptr),
           response(this, rhh, rbh),
           request_header_buf(nullptr),
           finalize_handler(fh) {}
@@ -42,8 +43,6 @@ public:
 
     void close(int rc);
 
-    bool is_finished() const { return finished; }
-
 private:
     bool check_timeout(Event* ev, int rc) {
         if (ev->is_timeout()) {
@@ -56,14 +55,14 @@ private:
     }
 
     int build_request();
-    int send_request();
+    void connect_success();
+    int do_writer();
 
     HttpUpstreamServer *server;
     HttpRequest *request;
     Connection* conn;
 
-    bool finished;
-
+    std::unique_ptr<HttpWriter> writer;
     HttpUpstreamResponse response;
 
     Buffer *request_header_buf;

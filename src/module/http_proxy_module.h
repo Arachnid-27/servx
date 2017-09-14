@@ -4,6 +4,7 @@
 #include "http_module.h"
 #include "http_upstream.h"
 #include "http_upstream_request.h"
+#include "http_writer.h"
 
 namespace servx {
 
@@ -14,7 +15,7 @@ struct HttpProxyLocConf: public HttpConf {
 
 struct HttpProxyRequestContext: public HttpRequestContext {
     std::unique_ptr<HttpUpstreamRequest> hur;
-    std::list<Buffer*> out;
+    std::unique_ptr<HttpWriter> writer;
 };
 
 class HttpProxyModule: public HttpModule {
@@ -41,9 +42,6 @@ public:
     static void proxy_pass_finalize_handler(HttpRequest* req, int rc);
 
     static void proxy_pass_write_handler(HttpRequest* req);
-
-private:
-    static int proxy_pass_write_out(Connection* conn, std::list<Buffer*>& out);
 };
 
 namespace command {
